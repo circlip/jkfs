@@ -30,7 +30,17 @@ static struct fuse_operations jk_ops = {
 	.getattr	= jk_getattr,
 	.access		= jk_access,
 	.readlink	= jk_readlink,
-
+    .getdir     = jk_getdir,
+    .mknod      = jk_mknod,
+    .mkdir      = jk_mkdir,
+    .unlink     = jk_unlink,
+    .rmdir      = jk_rmdir,
+    .unlink     = jk_unlink,
+    .rmdir      = jk_rmlink,
+    .symlink    = jk_symlink, 
+    .rename     = jk_rename,
+    .link       = jk_link,
+    .chmod      = jk_chmod,
 
 };
 
