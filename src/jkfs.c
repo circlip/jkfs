@@ -13,9 +13,10 @@
 #include <errno.h>
 #include <sys/time.h>
 
-#if defined HAVE_SETXATTR
+#ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
+
 #include <assert.h>
 
 #define MAXPATH 256
@@ -25,11 +26,13 @@ static char MP[MAXPATH];
 static size_t THRESH;
 static unsigned long count = 0;
 
+static struct fuse_operations jk_ops = {
+	.getattr	= jk_getattr,
+	.access		= jk_access,
+	.readlink	= jk_readlink,
 
 
-
-
-
+};
 
 int main()
 {
