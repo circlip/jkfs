@@ -18,7 +18,7 @@
 #endif
 
 #include <assert.h>
-
+#define JK_SUCCESS 0
 #define MAXPATH 256
 static char SSDPATH[MAXPATH];
 static char HDDPATH[MAXPATH];
@@ -27,12 +27,85 @@ static size_t THRESH;
 static unsigned long count = 0;
 
 
-static int jk_create(const char *path, mode_t mode, struct fuse_file_info *info) {
 
+#define getssdpath  char ssdpath[MAXPATH];      \
+                    strcpy(ssdpath, SSDPATH);   \
+                    strcat(ssdpath, path)
+
+#define calcxattrpath   char xattrpath[MAXPATH];    \
+                        strcpy(xattrpath, ssdpath); \
+                        strcat(xattrpath, path);    \
+                        strcpy(strrchr(xattrpath, '/') + 1, ".xattr_"); \
+                        strcat(xattrpath, strrchar(path, '/') + 1)
+
+#define calcxattrpath_with_realssdpath  strcpy(xattrpath, ssdpath); \
+                                        strcpy(strrchr(xattrpath, '/') + 1, ".xattr_"); \
+                                        strcat(xattrpath, strrchr(path, '/') + 1)
+
+static int gethddpath(const char* path, char* hddpath) {
+    struct stat statbuf;
+    char target[MAXPATH];
+    int res;
+    getssdpath;
+    res = lstat(ssdpath, &statbuf);
+    if (res == -1)
+        return -errno;
+    assert(S_ISLINK(statbuf.st_mode));
+    res = readlink(ssdpath, target, MAXPATH-1);
+    if (res == -1)
+        return -errno;
+    target[res] = 0;
+    strcpy(hddpath, HDDPATH);
+    strcat(hddpath, target);
+    return JK_SUCCESS;
+}
+
+
+static int xattr_exist(const char* path) {
+    int res;
+    calcxattrpath;
+    struct stat stbuf;
+    res = lstat(xattrpath, &stbuf);
+    if (res == 0)
+        return 1;
+    else 
+        return 0;
+}
+
+
+
+
+static int jk_create(const char *path, mode_t mode, struct fuse_file_info *info) {
+    int fd;
+    getssdpath;
+    fd = create(ssdpath, mode);
+    if (fd == -1)
+        return -errno;
+    close(fd);
+    return JK_SUCCESS;
 }
 
 static int jk_getattr(const char *path, struct stat *statbuf) {
-
+    int res;
+    getssdpath;
+    res = lstat(ssdpath, stbuf);
+    if (res == -1)
+        return -errno;
+    if (S_ISLINK(statbuf->st_mode) && xattr_exist(path)) {
+        int fd;
+        calcxattrpath;
+        fd = open(xattrpath, O_RDONLY);
+        if (fd != -1) {
+            res = read(fd, statbuf, sizeof(*statbuf));
+            close(fd);
+            if (res != sizeof(*statbuf)) {
+                return -errno;
+            } else {
+                return JK_SUCCESS;
+            }
+        }
+    }
+    return 0;
 }
 
 static int jk_access(const char *path, int mask) {
@@ -194,7 +267,7 @@ static struct fuse_operations jk_ops = {
 int read_args_from_file() {
     FILE *fp;
     if ((fp = fopen("args_file", "r")) == NULL) {
-        perror("read file error: args_file.\n");
+        perror("args_file");
         exit(EXIT_FAILURE);
     }
     fscanf(fd, "%zu %s %s %s", &THRESH, SSDPATH, HDDPATH, MP);
@@ -206,7 +279,7 @@ int main()
     struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
     fuse_opt_add_arg(&args, argv[0]);
     
-    // read arguments, mainly ssdpath, hddpath, etc.
+    // read arguments, mainly ssdpath, hddpath, and mountpoint.
     if (argc < 5) {
         read_args_from_file();
         if (argc == 2 && strncmp(argv[1], "-d", 2) == 0) 
