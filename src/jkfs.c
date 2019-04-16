@@ -34,6 +34,7 @@ static unsigned long count = 0;
                             strcpy(strrchr(xattrpath, '/') + 1, ".xattr_"); \
                             strcat(xattrpath, strrchr(path, '/') + 1)
 
+
 static int xattr_exist(const char* ssdpath) {
     int res;
     char xattrpath[MAXPATH];
@@ -104,10 +105,13 @@ static int jk_getattr(const char *path, struct stat *statbuf) {
     res = lstat(ssdpath, stbuf);
     if (res == -1)
         return -errno;
-    if (S_ISLINK(statbuf->st_mode) && xattr_exist(ssdpath)) {
+    char xattrpath[MAXPATH];
+    struct stat stbuf;
+    ssdpath2xattrpath;
+    res = lstat(xattrpath, &stbuf);
+
+    if (S_ISLINK(statbuf->st_mode) && !res) {
         int fd;
-        // fixme: call ssdpath2xattrpath twice!
-        ssdpath2xattrpath;
         fd = open(xattrpath, O_RDONLY);
         if (fd != -1) {
             res = read(fd, statbuf, sizeof(*statbuf));
@@ -188,59 +192,256 @@ static int jk_readdir(const char *path, char *buf,
 }
 
 static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
-    
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    int res;
+
+    if (S_ISREG(mode)) {
+        res = open(ssdpath, O_CREAT | O_EXCL | O_WRONLY, mode);
+        if (res >= 0) {
+            res = close(res);
+        }
+    } else if (S_ISFIFO(mode)) {
+        res =  mkfifo(ssdpath, mode);
+    } else {
+        res = mknode(ssdpath, mode, rdev);
+    }
+
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_mkdir(const char *path, mode_t mode) {
-
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    int res;
+    res = mkdir(ssdpath, mode);
+    if (res == -1) {
+        return -errno;
+    }
+    return  JK_SUCCESS;
 }
 
 static int jk_unlink(const char *path) {
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    int res;
+    char xattrpath[MAXPATH];
+    struct stat stbuf;
+    ssdpath2xattrpath;
+    res = lstat(xattrpath, &stbuf);
 
+    if (res == 0) {
+        char hddpath[MAXPATH];
+        res = ssdpath2hddpath(ssdpath, hddpath);
+        if (res) {
+            return -errno;
+        }
+        res = unlink(hddpath);
+        res = unlink(xattrpath);
+    }
+    res = unlink(ssdpath);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_rmdir(const char *path) {
-
+    int res;
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    res = rmdir(ssdpath);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_symlink(const char *from, const char *to) {
-
+    int res;
+    char *path = to;
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    res = symlink(from, ssdpath);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_rename(const char *from, const char *to) {
+    int res;
+    char* path = from;
+    char ssdpath[MAXPATH];
+    char ssdpath_from[MAXPATH];
+    char ssdpath_to[MAXPATH];
+    path2ssdpath;
+    strcpy(ssdpath_from, ssdpath);
+    path = to;
+    path2ssdpath;
+    strcpy(ssdpath_to, ssdpath);
+    res = rename(ssdpath_from, ssdpath_to);
+    if (res == -1) {
+        return -errno;
+    }
+    
+    char xattrpath[MAXPATH];
+    strcpy(ssdpath, ssdpath_from);
+    ssdpath2xattrpath;
+    struct stat stbuf;
+    res = lstat(xattrpath, &stbuf);
+    if (res == 0) {
+        char xattrpath_from[MAXPATH];
+        char xattrpath_to[MAXPATH];
+        strcpy(xattrpath_from, xattrpath);
 
+        strcpy(ssdpath, ssdpath_to);
+        ssdpath2xattrpath;
+        strcpy(xattrpath_to, xattrpath);
+        res = rename(xattrpath_from, xattrpath_to);
+        if (res == -1) {
+            return -errno;
+        }
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_chmod(const char *path, mode_t mode) {
-
+    int res;
+    char ssdpath[MAXPATH];
+    path2ssdpath4links(path, ssdpath);
+    char xattrpath[MAXPATH], hddpath[MAXPATH];
+    ssdpath2xattrpath;
+    struct stat stbuf;
+    res = lstat(xattrpath, &stbuf);
+    if (res == 0) {
+        ssdpath2hddpath(ssdpath, hddpath);
+        if (chmod(hddpath, mode) == -1) {
+            return -errno;
+        }
+        if (lstat(hddpath, &stbuf) != 0) {
+            return -errno;
+        }
+        int fd;
+        if ((fd = open(xattrpath, O_WRONLY)) < 0) {
+            return -errno;
+        }
+        if ((res = write(xattrpath, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
+            close(fd);
+            return -errno;
+        }
+        close(fd);
+        return JK_SUCCESS;
+    }
 }
 
 static int jk_chown(const char* path, uid_t userid, gid_t groupid) {
-
+    int res;
+    char ssdpath[MAXPATH];
+    path2ssdpath;
+    res = lchown(ssdpath, userid, groupid);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_truncate(const char *path, off_t size) {
+    char ssdpath[MAXPATH], _path[MAXPATH], xattrpath[MAXPATH], hddpath[MAXPATH];
+    int res;
+    path2ssdpath4links;
+    ssdpath2xattrpath;
+    struct stat stbuf;
+    res = lstat(xattrpath, &stbuf);
+    // size larger than threshold and should be placed in hdd
+    if (size > THRESH) {
+        if (res != 0) {     // original placed in ssd
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            ssdpath2hddpath(ssdpath, hddpath);
+            // fixme: where is &count come from
+            sprintf(strrchr(hddpath, '/') + 1, "%s_%u%lu", strrchr(path, '/') + 1, 
+                        (unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
+            rename(ssdpath, hddpath);
+            res = truncate(hddpath, size);
+            if (res) {
+                return -errno;
+            }
+            unlink(ssdpath);
+            symlink(strrchr(hddpath, '/') + 1, ssdpath);
 
+        } else {            // originally placed in hdd
+            ssdpath2hddpath(ssdpath, hddpath);
+            res = truncate(hddpath, size);
+            if (res) {
+                return -errno;
+            }
+        }
+    } else {    // size smaller than threshold 
+        if (res != 0) {
+            truncate(ssdpath, size);
+        } else {
+            // move from hdd to ssd
+            ssdpath2hddpath(ssdpath, hddpath);
+            truncate(hddpath, size);
+            unlink(ssdpath);
+            rename(hddpath, ssdpath);
+            unlink(hddpath);
+            unlink(xattrpath);
+        }
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
-
+    // todo:
 }
 
 static int jk_open(const char *path, struct fuse_file_info *info) {
+    int res;
+    char _path[MAXPATH], xattrpath[MAXPATH];
+    path2ssdpath;
+    ssdpath2xattrpath;
+    struct stat stbuf;
+    res =  lstat(xattrpath, &stbuf);
+    if (res == 0) {
+        ssdpath2hddpath(ssdpath, _path);
+    } else {
+        strcpy(_path, ssdpath);
+    }
+
+    res = open(_path, info->flags);
+    if (res == -1) {
+        return -errno;
+    }
+    return res;
 
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *info) {
-
+    int fd, res;
+    fd = jk_open(path, info);
+    if (fd < 0) {
+        return -errno;
+    } 
+    res = read(fd, buf, size, offset);
+    if (res == -1) {
+        return -errno;
+    }
+    close(fd);
+    return res;
 }
 
 static int jk_write(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *info) {
-
+    int fd, res;
+    // todo:
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
@@ -362,13 +563,4 @@ int main()
     fuse_opt_add_arg(&args, MP);
     return fuses_main(args.argc, args.argv, &jk_ops, NULL);
 }
-
-
-
-
-
-
-
-
-
 
