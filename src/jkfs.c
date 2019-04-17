@@ -1,6 +1,5 @@
-// TODO: define not finished
-#define FUSE_USE_VERSION 
-#define _XOPEN_SOURCE 
+#define FUSE_USE_VERSION 29 
+ 
 
 #include <fuse.h>
 #include <stdio.h>
@@ -362,7 +361,7 @@ static int jk_truncate(const char *path, off_t size) {
             struct timeval tv;
             gettimeofday(&tv, NULL);
             ssdpath2hddpath(ssdpath, hddpath);
-            // fixme: where is &count come from
+            // fixme: why the file should be named in this way?
             sprintf(strrchr(hddpath, '/') + 1, "%s_%u%lu", strrchr(path, '/') + 1, 
                         (unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
             rename(ssdpath, hddpath);
@@ -537,7 +536,8 @@ static int jk_removexattr(const char *path, const char *name) {
 }
 #endif /* HAVE_SETXATTR */
 
-
+// todo: some operations have not implemented yet 
+// and should be excluded from this struct
 static struct fuse_operations jk_ops = {
 	.getattr	= jk_getattr,
 	.access		= jk_access,
