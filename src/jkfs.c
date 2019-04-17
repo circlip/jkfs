@@ -1,5 +1,4 @@
 #define FUSE_USE_VERSION 29 
- 
 
 #include <fuse.h>
 #include <stdio.h>
@@ -396,7 +395,47 @@ static int jk_truncate(const char *path, off_t size) {
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
-    // todo:
+    int res;
+    char ssdpath[MAXPATH], xattrpath[MAXPATH];
+    path2ssdpath;
+    ssdpath2xattrpath;
+    struct stat stbuf;
+    res = lstat(xattrpath, &stbuf);
+    if (res == 0) {
+        int fd;
+        fd = open(xattr, O_RDWR);
+        if (fd < 0) {
+            return -errno;
+        }
+        res = read(fd, &stbuf, sizeof(stbuf));
+
+        // begin error handling
+        if (res != sizeof(stbuf)) {
+            close(fd);
+            return -errno;
+        }
+        // end of error handling
+
+        memcpy(&stbuf.st_atime, ts, sizeof(*ts));
+        memcpy(&stbuf.st_mtime, &(ts[1]), sizeof(*ts));
+        res = write(fd, &stbuf, sizeof(stbuf));
+
+        // begin error handling
+        if (res == -1) {
+            close(fd);
+            return -errno;
+        }
+        // end of error handling
+
+        close(fd);
+        return JK_SUCCESS;
+    } else {
+        res = utimensat(0, ssdpath, ts, AT_SYMLINK_NOFOLLOW);
+        if (res == -1) {
+            return -errno;
+        }
+        return JK_SUCCESS;
+    }
 }
 
 static int jk_open(const char *path, struct fuse_file_info *info) {
@@ -420,6 +459,8 @@ static int jk_open(const char *path, struct fuse_file_info *info) {
 
 }
 
+// fixme: file descriptor instead of path is passed to function write.
+// this implementation seems to be wrong!
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *info) {
@@ -436,11 +477,61 @@ static int jk_read(const char *path, char *buf,
     return res;
 }
 
+// fixme: file descriptor instead of path is passed to function write.
+// this implementation seems to be wrong!
 static int jk_write(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *info) {
     int fd, res;
-    // todo:
+    char ssdpath[MAXPATH], xattrpath[MAXPATH], hddpath[MAXPATH];
+    char _path[MAXPATH];
+    struct stat stbuf;
+    path2ssdpath;
+    ssdpath2xattrpath;
+    res = lstat(xattrpath, &stbuf);
+    if (res == 0) {
+           // xattrpath exists, originally placed in hdd
+           ssdpath2hddpath(ssdpath, hddpath);
+           flag = 1; // xattr file needs to be edited
+
+    } else {
+        // xattrpath does not exist, originally placed in ssd 
+        
+        res = stat(ssdpath, &stbuf);
+        if (res == -1) {
+            return -errno;
+        }
+
+        if (stbuf.st_size + size > THRESH + THRESH >> 1) {
+            // too larger, move to hdd
+            // ssdpath2hddpath(ssdpath, hddpath);
+            flag = 1; // need to create an .xattr file
+
+            // fixme: why should the file should be name in this way
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            sprintf(hddpath, "%s%s_%u%lu", HDDPATH, strrchr(path, '/') + 1, 
+                    (unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));            
+
+            rename(ssdpath, hddpath);
+            unlink(ssdpath);
+            symlink(strrchr(hddpath, '/') + 1, ssdpath);
+            strcpy(_path, hddpath);
+        } else {
+            // no need to move
+            strcpy(_path, ssdpath);
+        }
+    }
+
+    fd = open(_path, O_WRONLY);
+    res = pwrite(fd, buf, size, offset);
+    if (res != size) {
+        return -errno;
+    }
+    close(fd);
+
+    // update xattr
+
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
@@ -467,6 +558,7 @@ static int jk_fallocate(const char *path, int mode,
                         off_t offset, off_t length, 
                         struct fuse_file_info *info) {
     int fd, res;
+    // fixme: path not refer to real ssdpath or hddpath
     (void) info;
     if (mode) {
         return -EOPNOTSUPP;
@@ -536,26 +628,23 @@ static int jk_removexattr(const char *path, const char *name) {
 }
 #endif /* HAVE_SETXATTR */
 
-// todo: some operations have not implemented yet 
-// and should be excluded from this struct
 static struct fuse_operations jk_ops = {
 	.getattr	= jk_getattr,
 	.access		= jk_access,
 	.readlink	= jk_readlink,
-	.getdir		= jk_getdir,
+	// .getdir		= jk_getdir,
 	.mknod		= jk_mknod,
 	.mkdir		= jk_mkdir,
 	.unlink		= jk_unlink,
 	.rmdir		= jk_rmdir,
-	.unlink		= jk_unlink,
-	.rmdir		= jk_rmlink,
+	// .rmlink		= jk_rmlink,
 	.symlink	= jk_symlink, 
 	.rename		= jk_rename,
-	.link		= jk_link,
+	// .link		= jk_link,
 	.chmod		= jk_chmod,
 	.chown		= jk_chown,
 	.truncate	= jk_truncate ,
-	.utime		= jk_utime,
+	.utimens	= jk_utimens,
 	.open		= jk_open,
 	.read		= jk_read,
 	.write		= jk_write,
@@ -580,12 +669,12 @@ static struct fuse_operations jk_ops = {
 	.fgetattr	= jk_fgetattr,
 	.lock		= jk_lock,
 	.utimens	= jk_utimens,
-	.bmap		= jk_bmap,
-	.ioctl		= jk_ioctl,
-	.poll		= jk_poll,
-	.write_buf	= jk_write_buf,
-	.read_buf	= jk_read_buf,
-	.flock		= jk_flock,
+	// .bmap		= jk_bmap,
+	// .ioctl		= jk_ioctl,
+	// .poll		= jk_poll,
+	// .write_buf	= jk_write_buf,
+	// .read_buf	= jk_read_buf,
+	// .flock		= jk_flock,
 	.fallocate	= jk_fallocate,
 };
 
