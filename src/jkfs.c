@@ -76,7 +76,7 @@ static int ssdpath2hddpath(const char* ssdpath, char* hddpath) {
     if (res == -1) {
         return -errno;
     }
-    assert(S_ISLINK(stbuf.st_mode));
+    assert(S_ISLNK(stbuf.st_mode));
     res = readlink(ssdpath, target, MAXPATH - 1);
     if (res == -1) {
         return -errno;
@@ -110,7 +110,7 @@ static int jk_getattr(const char *path, struct stat *statbuf) {
     ssdpath2xattrpath;
     res = lstat(xattrpath, &stbuf);
 
-    if (S_ISLINK(statbuf->st_mode) && !res) {
+    if (S_ISLNK(statbuf->st_mode) && !res) {
         int fd;
         fd = open(xattrpath, O_RDONLY);
         if (fd != -1) {
@@ -445,40 +445,97 @@ static int jk_write(const char *path, const char *buf,
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
-
+    fprintf(stderr, "Not implemented yet.\n");
+    return -1;
 }
 
 static int jk_release(const char *path, struct fuse_file_info *info) {
-
+    (void) path;
+    (void) info;
+    return JK_SUCCESS;
 }
 
-static int jk_fsync(const char *path, int isdatasync) {
-
+static int jk_fsync(const char *path, int isdatasync,
+                    struct fuse_file_info *info) {
+    (void) path;
+    (void) info;
+    return JK_SUCCESS;
 }
 
+
+#ifdef HAVE_POSIX_FALLOCATE
 static int jk_fallocate(const char *path, int mode, 
                         off_t offset, off_t length, 
                         struct fuse_file_info *info) {
+    int fd, res;
+    (void) info;
+    if (mode) {
+        return -EOPNOTSUPP;
+    }
 
+    fd = open(path, O_WRONLY);
+    if (fd < 0) {
+        return -errno;
+    }
+    res = posix_fallocate(fd, offset, length);
+    close(fd);
+    return -res;
 }
+#else
+static int jk_fallocate(const char *path, int mode, 
+                        off_t offset, off_t length,
+                        struct fuse_file_info *info) {
+    // fixme: path not refer to real ssdpath or hddpath
+    int fd, res;
+    (void) info;
+    fd = open(path, O_WRONLY);
+    if (fd < 0) {
+        return -errno;
+    }
+    res = fallocate(path, mode, offset, length);
+    if (res < 0) {
+        return -errno;
+    }
+    close(fd);
+    return JK_SUCCESS;
+}
+#endif /* HAVE_POSIX_FALLOCATE */
 
+
+#ifdef HAVE_SETXATTR
 static int jk_setxattr(const char *path, const char *name, const char *value, 
                        size_t size, int flag) {
-
+    int res = lsetxattr(path, name, value, size, flag);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_getxattr(const char *path, const char *name, char *value, size_t size) {
-
+    int res = lgetxattr(path, name, value, size);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_listxattr(const char *path, char *list, size_t size) {
-
+    int res = llistxattr(path, list, size);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
 
 static int jk_removexattr(const char *path, const char *name) {
-
+    int res = lremovexattr(path, name);
+    if (res == -1) {
+        return -errno;
+    }
+    return JK_SUCCESS;
 }
-
+#endif /* HAVE_SETXATTR */
 
 
 static struct fuse_operations jk_ops = {
@@ -506,10 +563,12 @@ static struct fuse_operations jk_ops = {
 	.flush		= jk_flush,
 	.release	= jk_release,
 	.fsync		= jk_fsync,
+#ifdef HAVE_SETXATTR
 	.setxattr	= jk_setxattr,
 	.getxattr	= jk_getxattr,
 	.listxattr	= jk_listxattr,
  	.removexattr= jk_removexattr,
+#endif
 	.opendir	= jk_opendir,
 	.readdir	= jk_readdir,
 	.releasedir	= jk_releasedir,
@@ -554,7 +613,7 @@ int main()
         fputs("error in threshold, ssdpath, hddpath, mountpoint\n", stderr);
         exit(EXIT_FAILURE);
     } else {
-        THRES = atoi(argv[1]);
+        THRESH = atoi(argv[1]);
         strcpy(SSDPATH, argv[2]);
         strcpy(HDDPATH, argv[3]);
         strcpy(MP, argv[4]);
