@@ -30,7 +30,7 @@ static unsigned long count = 0;
 
 #define ssdpath2xattrpath   strcpy(xattrpath, ssdpath); \
                             strcpy(strrchr(xattrpath, '/') + 1, ".xattr_"); \
-                            strcat(xattrpath, strrchr(path, '/') + 1)
+                            strcat(xattrpath, strrchr(ssdpath, '/') + 1)
 
 
 static int xattr_exist(const char* ssdpath) {
@@ -85,18 +85,18 @@ static int ssdpath2hddpath(const char* ssdpath, char* hddpath) {
     return JK_SUCCESS;
 }
 
-static int jk_create(const char *path, mode_t mode, struct fuse_file_info *info) {
+static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) {
     int fd;
     char ssdpath[MAXPATH];
     path2ssdpath;
-    fd = create(ssdpath, mode);
+    fd = creat(ssdpath, mode);
     if (fd == -1)
         return -errno;
     close(fd);
     return JK_SUCCESS;
 }
 
-static int jk_getattr(const char *path, struct stat *statbuf) {
+static int jk_getattr(const char *path, struct stat *stbuf) {
     int res;
     char ssdpath[MAXPATH];
     path2ssdpath;
@@ -104,7 +104,7 @@ static int jk_getattr(const char *path, struct stat *statbuf) {
     if (res == -1)
         return -errno;
     char xattrpath[MAXPATH];
-    struct stat stbuf;
+//    struct stat stbuf;
     ssdpath2xattrpath;
     res = lstat(xattrpath, &stbuf);
 
@@ -112,9 +112,9 @@ static int jk_getattr(const char *path, struct stat *statbuf) {
         int fd;
         fd = open(xattrpath, O_RDONLY);
         if (fd != -1) {
-            res = read(fd, statbuf, sizeof(*statbuf));
+            res = read(fd, stbuf, sizeof(*stbuf));
             close(fd);
-            if (res != sizeof(*statbuf)) {
+            if (res != sizeof(*stbuf)) {
                 return -errno;
             } else {
                 return JK_SUCCESS;
@@ -650,7 +650,7 @@ static struct fuse_operations jk_ops = {
 	.read		= jk_read,
 	.write		= jk_write,
 	.statfs		= jk_statfs,
-	.flush		= jk_flush,
+	// .flush		= jk_flush,
 	.release	= jk_release,
 	.fsync		= jk_fsync,
 #ifdef HAVE_SETXATTR
@@ -659,16 +659,16 @@ static struct fuse_operations jk_ops = {
 	.listxattr	= jk_listxattr,
  	.removexattr= jk_removexattr,
 #endif
-	.opendir	= jk_opendir,
+	// .opendir	= jk_opendir,
 	.readdir	= jk_readdir,
-	.releasedir	= jk_releasedir,
-	.fsyncdir	= jk_fsyncdir,
-	.init		= jk_init,
-	.destroy	= jk_destroy,
-	.create		= jk_create,
-	.ftruncate	= jk_ftruncate,
+	// .releasedir	= jk_releasedir,
+	// .fsyncdir	= jk_fsyncdir,
+	// .init		= jk_init,
+	// .destroy	= jk_destroy,
+	.creat		= jk_creat,
+	// .ftruncate	= jk_ftruncate,
 	.fgetattr	= jk_fgetattr,
-	.lock		= jk_lock,
+	// .lock		= jk_lock,
 	.utimens	= jk_utimens,
 	// .bmap		= jk_bmap,
 	// .ioctl		= jk_ioctl,
@@ -685,7 +685,7 @@ int read_args_from_file() {
         perror("args_file");
         exit(EXIT_FAILURE);
     }
-    fscanf(fd, "%zu %s %s %s", &THRESH, SSDPATH, HDDPATH, MP);
+    fscanf(fp, "%zu %s %s %s", &THRESH, SSDPATH, HDDPATH, MP);
     return;
 }
 
