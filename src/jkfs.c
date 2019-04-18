@@ -96,7 +96,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) 
     return JK_SUCCESS;
 }
 
-static int jk_getattr(const char *path, struct stat *stbuf) {
+static int jk_fgetattr(const char *path, struct stat *stbuf) {
     int res;
     char ssdpath[MAXPATH];
     path2ssdpath;
@@ -106,9 +106,9 @@ static int jk_getattr(const char *path, struct stat *stbuf) {
     char xattrpath[MAXPATH];
 //    struct stat stbuf;
     ssdpath2xattrpath;
-    res = lstat(xattrpath, &stbuf);
+    res = lstat(xattrpath, stbuf);
 
-    if (S_ISLNK(statbuf->st_mode) && !res) {
+    if (S_ISLNK(stbuf->st_mode) && !res) {
         int fd;
         fd = open(xattrpath, O_RDONLY);
         if (fd != -1) {
@@ -202,7 +202,7 @@ static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
     } else if (S_ISFIFO(mode)) {
         res =  mkfifo(ssdpath, mode);
     } else {
-        res = mknode(ssdpath, mode, rdev);
+        res = mknod(ssdpath, mode, rdev);
     }
 
     if (res == -1) {
@@ -260,7 +260,8 @@ static int jk_rmdir(const char *path) {
 
 static int jk_symlink(const char *from, const char *to) {
     int res;
-    char *path = to;
+    char path[MAXPATH];
+    strcpy(path, to);
     char ssdpath[MAXPATH];
     path2ssdpath;
     res = symlink(from, ssdpath);
@@ -272,7 +273,8 @@ static int jk_symlink(const char *from, const char *to) {
 
 static int jk_rename(const char *from, const char *to) {
     int res;
-    char* path = from;
+    char path[MAXPATH];
+    strcpy(path, from);
     char ssdpath[MAXPATH];
     char ssdpath_from[MAXPATH];
     char ssdpath_to[MAXPATH];
@@ -327,7 +329,7 @@ static int jk_chmod(const char *path, mode_t mode) {
         if ((fd = open(xattrpath, O_WRONLY)) < 0) {
             return -errno;
         }
-        if ((res = write(xattrpath, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
+        if ((res = write(fd, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
             close(fd);
             return -errno;
         }
@@ -403,7 +405,7 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
     res = lstat(xattrpath, &stbuf);
     if (res == 0) {
         int fd;
-        fd = open(xattr, O_RDWR);
+        fd = open(xattrpath, O_RDWR);
         if (fd < 0) {
             return -errno;
         }
@@ -440,7 +442,7 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
 
 static int jk_open(const char *path, struct fuse_file_info *info) {
     int res;
-    char _path[MAXPATH], xattrpath[MAXPATH];
+    char ssdpath[MAXPATH], _path[MAXPATH], xattrpath[MAXPATH];
     path2ssdpath;
     ssdpath2xattrpath;
     struct stat stbuf;
@@ -469,7 +471,7 @@ static int jk_read(const char *path, char *buf,
     if (fd < 0) {
         return -errno;
     } 
-    res = read(fd, buf, size, offset);
+    res = read(fd, buf, size);
     if (res == -1) {
         return -errno;
     }
@@ -482,7 +484,7 @@ static int jk_read(const char *path, char *buf,
 static int jk_write(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *info) {
-    int fd, res;
+    int fd, res, flag;
     char ssdpath[MAXPATH], xattrpath[MAXPATH], hddpath[MAXPATH];
     char _path[MAXPATH];
     struct stat stbuf;
@@ -564,7 +566,7 @@ static int jk_fallocate(const char *path, int mode,
     }
     // note: the use of jk_open may be incorrect
     // fd = open(path, O_WRONLY);
-    fd = jk_open(path, O_WRONLY);
+    fd = jk_open(path, info);
     if (fd < 0) {
         return -errno;
     }
@@ -580,7 +582,7 @@ static int jk_fallocate(const char *path, int mode,
     (void) info;
     // note: the use of jk_open may be incorrect
     // fd = open(path, O_WRONLY);
-    fd = jk_open(path, O_WRONLY);
+    fd = jk_open(path, info);
     if (fd < 0) {
         return -errno;
     }
@@ -665,7 +667,7 @@ static struct fuse_operations jk_ops = {
 	// .fsyncdir	= jk_fsyncdir,
 	// .init		= jk_init,
 	// .destroy	= jk_destroy,
-	.creat		= jk_creat,
+	.create		= jk_creat,
 	// .ftruncate	= jk_ftruncate,
 	.fgetattr	= jk_fgetattr,
 	// .lock		= jk_lock,
@@ -686,10 +688,10 @@ int read_args_from_file() {
         exit(EXIT_FAILURE);
     }
     fscanf(fp, "%zu %s %s %s", &THRESH, SSDPATH, HDDPATH, MP);
-    return;
+    return JK_SUCCESS;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
     fuse_opt_add_arg(&args, argv[0]);
@@ -710,6 +712,6 @@ int main()
     }
 
     fuse_opt_add_arg(&args, MP);
-    return fuses_main(args.argc, args.argv, &jk_ops, NULL);
+    return fuse_main(args.argc, args.argv, &jk_ops, NULL);
 }
 
