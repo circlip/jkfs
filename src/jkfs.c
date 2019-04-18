@@ -1,5 +1,5 @@
 #define FUSE_USE_VERSION 29 
-
+#define _GNU_SOURCE
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,7 +96,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) 
     return JK_SUCCESS;
 }
 
-static int jk_fgetattr(const char *path, struct stat *stbuf) {
+static int jk_getattr(const char *path, struct stat *stbuf) {
     int res;
     char ssdpath[MAXPATH];
     path2ssdpath;
@@ -158,36 +158,64 @@ static int jk_readlink(const char *path, char* buf, size_t size) {
     return JK_SUCCESS;
 }
 
-static int jk_readdir(const char *path, char *buf, 
-                      fuse_fill_dir_t filler, 
-                      off_t offset, struct fuse_file_info *info) {
-    DIR *dp;
-    struct dirent *de;
-    (void)offset;
-    (void)info;
-    char ssdpath[MAXPATH];
-    path2ssdpath;
-    dp = opendir(ssdpath);
-    if (dp == NULL) {
-        return -errno;
-    }
-    while ((de = readdir(dp)) != NULL) {
-        struct stat st;
-        if (strncmp(de->d_name, ".xattr_", 7) == 0) {
-            continue;
-        }
-        memset(&st, 0, sizeof(st));
-        st.st_ino = de->d_ino;
-        st.st_mode = de->d_type << 12;
-
-        if (filler(buf, de->d_name, &st, 0)) {
-            break;
-        }
-    }
-
-    closedir(dp);
-    return JK_SUCCESS;
+static int jk_opendir(const char *path, struct fuse_file_info *info) {
+	char ssdpath[MAXPATH];
+	path2ssdpath;
+	info->fh = (intptr_t)opendir(ssdpath);
+	return JK_SUCCESS;
 }
+
+static int jk_readdir(const char *path, char *buf, 
+						fuse_fill_dir_t filler, off_t offset, 
+						struct fuse_file_info *fi) {
+	int res = 0;
+	DIR *dp;
+	struct dirent *de;
+	dp = (DIR *)(uintptr_t)fi->fh;
+	while ((de = readdir(dp)) != NULL) {
+		if (strncmp(de->d_name, ".xattr_", 7) == 0) continue;
+		struct stat st;
+		memset(&st, 0, sizeof(st));
+		st.st_ino = de->d_ino;
+		st.st_mode = de->d_type << 12;
+		if (filler(buf, de->d_name, &st, 0)) {
+			break;	
+		}	
+	}	
+	closedir(dp);
+	return JK_SUCCESS;
+}
+
+// static int jk_readdir(const char *path, char *buf, 
+//                       fuse_fill_dir_t filler, 
+//                       off_t offset, struct fuse_file_info *info) {
+//     DIR *dp;
+//     struct dirent *de;
+//     (void)offset;
+//     (void)info;
+//     char ssdpath[MAXPATH];
+//     path2ssdpath;
+//     dp = opendir(ssdpath);
+//     if (dp == NULL) {
+//         return -errno;
+//     }
+//     while ((de = readdir(dp)) != NULL) {
+//         struct stat st;
+//         if (strncmp(de->d_name, ".xattr_", 7) == 0) {
+//             continue;
+//         }
+//         memset(&st, 0, sizeof(st));
+//         st.st_ino = de->d_ino;
+//         st.st_mode = de->d_type << 12;
+// 
+//         if (filler(buf, de->d_name, &st, 0)) {
+//             break;
+//         }
+//     }
+// 
+//     closedir(dp);
+//     return JK_SUCCESS;
+// }
 
 static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
     char ssdpath[MAXPATH];
@@ -280,7 +308,7 @@ static int jk_rename(const char *from, const char *to) {
     char ssdpath_to[MAXPATH];
     path2ssdpath;
     strcpy(ssdpath_from, ssdpath);
-    path = to;
+	strcpy(path, to);
     path2ssdpath;
     strcpy(ssdpath_to, ssdpath);
     res = rename(ssdpath_from, ssdpath_to);
@@ -586,7 +614,7 @@ static int jk_fallocate(const char *path, int mode,
     if (fd < 0) {
         return -errno;
     }
-    res = fallocate(path, mode, offset, length);
+    res = fallocate(fd, mode, offset, length);
     if (res < 0) {
         return -errno;
     }
@@ -661,7 +689,7 @@ static struct fuse_operations jk_ops = {
 	.listxattr	= jk_listxattr,
  	.removexattr= jk_removexattr,
 #endif
-	// .opendir	= jk_opendir,
+	.opendir	= jk_opendir,
 	.readdir	= jk_readdir,
 	// .releasedir	= jk_releasedir,
 	// .fsyncdir	= jk_fsyncdir,
@@ -669,7 +697,7 @@ static struct fuse_operations jk_ops = {
 	// .destroy	= jk_destroy,
 	.create		= jk_creat,
 	// .ftruncate	= jk_ftruncate,
-	.fgetattr	= jk_fgetattr,
+    // .fgetattr	= jk_fgetattr,
 	// .lock		= jk_lock,
 	.utimens	= jk_utimens,
 	// .bmap		= jk_bmap,

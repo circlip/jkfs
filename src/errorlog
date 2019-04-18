@@ -1,2 +1,0 @@
-gcc -o jkfs jkfs.c -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse -g -lfuse -pthread
-Makefile:4: recipe for target 'install' failed
