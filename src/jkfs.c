@@ -558,13 +558,13 @@ static int jk_fallocate(const char *path, int mode,
                         off_t offset, off_t length, 
                         struct fuse_file_info *info) {
     int fd, res;
-    // fixme: path not refer to real ssdpath or hddpath
     (void) info;
     if (mode) {
         return -EOPNOTSUPP;
     }
-
-    fd = open(path, O_WRONLY);
+    // note: the use of jk_open may be incorrect
+    // fd = open(path, O_WRONLY);
+    fd = jk_open(path, O_WRONLY);
     if (fd < 0) {
         return -errno;
     }
@@ -576,10 +576,11 @@ static int jk_fallocate(const char *path, int mode,
 static int jk_fallocate(const char *path, int mode, 
                         off_t offset, off_t length,
                         struct fuse_file_info *info) {
-    // fixme: path not refer to real ssdpath or hddpath
     int fd, res;
     (void) info;
-    fd = open(path, O_WRONLY);
+    // note: the use of jk_open may be incorrect
+    // fd = open(path, O_WRONLY);
+    fd = jk_open(path, O_WRONLY);
     if (fd < 0) {
         return -errno;
     }
