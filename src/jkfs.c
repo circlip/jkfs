@@ -414,7 +414,7 @@ static int jk_truncate(const char *path, off_t size) {
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
             // todo: seems no need to name it this way
-            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
                         __sync_fetch_and_add(&count, 1));
             res = rename(ssdpath, hddpath);
@@ -627,7 +627,7 @@ static int jk_fallocate(const char *path, int mode,
                         struct fuse_file_info *fi) {
     int fd, res;
     (void) fi;
-    fd = jk_open(path, info);
+    fd = jk_open(path, fi->flags);
     if (fd < 0) {
         return -errno;
     }
