@@ -533,7 +533,7 @@ static int jk_write(const char *path, const char *buf,
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
             // todo: seems no need to name it this way
-            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
                         __sync_fetch_and_add(&count, 1));
             rename(ssdpath, hddpath);
@@ -613,7 +613,7 @@ static int jk_fallocate(const char *path, int mode,
     if (mode) {
         return -EOPNOTSUPP;
     }
-    fd = jk_open(path, fi->flags);
+    fd = jk_open(path, fi);
     if (fd < 0) {
         return -errno;
     }
@@ -627,7 +627,7 @@ static int jk_fallocate(const char *path, int mode,
                         struct fuse_file_info *fi) {
     int fd, res;
     (void) fi;
-    fd = jk_open(path, fi->flags);
+    fd = jk_open(path, fi);
     if (fd < 0) {
         return -errno;
     }
