@@ -147,8 +147,10 @@ static int jk_access(const char *path, int mask) {
         res = access(ssdpath, mask);
         return res;
     } else {
-        // sad. it seems better to read the xattr file to find out.
+        // todo: sad. it seems better to read the xattr file to find out.
         // but somehow it is troublesome
+        char hddpath[MAXPATH];
+        res = xattr2hdd(xattrpath, hddpath);
         res = access(hddpath, mask);
         return res;
     }
@@ -308,7 +310,7 @@ static int jk_chmod(const char *path, mode_t mode) {
     res = path2ssd(path, ssdpath);
     res = ssd2xattr(ssdpath, xattrpath);
     if (res == 0) {
-        if ((res = chmode(xattrpath, mode)) == -1) {
+        if ((res = chmod(xattrpath, mode)) == -1) {
             return -errno;
         }
         char hddpath[MAXPATH];
@@ -321,7 +323,7 @@ static int jk_chmod(const char *path, mode_t mode) {
         struct stat stbuf;
         lstat(hddpath, &stbuf);
         int fd;
-        if ((fd = open(xattrpath, O_WRONLY))) < 0) {
+        if ((fd = open(xattrpath, O_WRONLY)) < 0) {
             return -errno;
         }
         if ((res = write(fd, &stbuf, sizeof(stbuf)))!= sizeof(stbuf)) {
@@ -354,7 +356,7 @@ static int jk_chown(const char* path, uid_t uid, gid_t gid) {
         struct stat stbuf;
         lstat(hddpath, &stbuf);
         int fd;
-        if ((fd = open(xattrpath, O_WRONLY))) < 0) {
+        if ((fd = open(xattrpath, O_WRONLY)) < 0) {
             return -errno;
         }
         if ((res = write(fd, &stbuf, sizeof(stbuf)))!= sizeof(stbuf)) {
@@ -409,10 +411,10 @@ static int jk_truncate(const char *path, off_t size) {
         if (size > THRESH + (THRESH >> 1)) {
             // move to hdd
             char hddpath[MAXPATH];
-            struct timesval timestamp;
+            struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
             // todo: seems no need to name it this way
-            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1),
+            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
                         __sync_fetch_and_add(&count, 1));
             res = rename(ssdpath, hddpath);
@@ -528,10 +530,10 @@ static int jk_write(const char *path, const char *buf,
 
             // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
             char hddpath[MAXPATH];
-            struct timesval timestamp;
+            struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
             // todo: seems no need to name it this way
-            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1),
+            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
                         __sync_fetch_and_add(&count, 1));
             rename(ssdpath, hddpath);
@@ -565,6 +567,8 @@ static int jk_write(const char *path, const char *buf,
         res = pwrite(fi->fh, buf, size, offset);
         struct stat st;
         int ress, fdd;
+        char hddpath[MAXPATH];
+        res = xattr2hdd(xattrpath, hddpath);
         if ((ress = lstat(hddpath, &st)) == -1) {
             return -errno;
         } 
@@ -609,7 +613,7 @@ static int jk_fallocate(const char *path, int mode,
     if (mode) {
         return -EOPNOTSUPP;
     }
-    fd = jk_open(path, info);
+    fd = jk_open(path, fi->flags);
     if (fd < 0) {
         return -errno;
     }
