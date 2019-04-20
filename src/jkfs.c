@@ -369,7 +369,78 @@ static int jk_chown(const char* path, uid_t uid, gid_t gid) {
 } 
 
 static int jk_truncate(const char *path, off_t size) {
-    // todo:
+    int res;
+    char ssdpath[MAXPATH], xattrpath[MAXPATH];
+    res = path2ssd_deep(path, ssdpath);
+    res = ssd2xattr(ssdpath, xattrpath);
+    if (res == 0) {
+        // originally located in hdd
+        char hddpath[MAXPATH];
+        res = xattr2hdd(xattrpath, hddpath);
+        if (size < THRESH) {
+            // move to ssd
+            res = truncate(hddpath, size);
+            unlink(ssdpath);
+            res = rename(hddpath, ssdpath);
+            unlink(hddpath);
+            unlink(xattrpath);
+            return JK_SUCCESS;
+        } else {
+            // remain in hdd
+            res = truncate(hddpath, size);
+            // update xattr
+            struct stat st;
+            if ((res = lstat(hddpath, &st)) == -1) {
+                return -errno;
+            }
+            int fd;
+            if ((fd = open(xattrpath, O_WRONLY)) < 0) {
+                return -errno;
+            }
+            if ((res = write(fd, &st, sizeof(st))) != sizeof(st)) {
+                close(fd);
+                return -errno;
+            }
+            close(fd);
+            return JK_SUCCESS;
+        }
+    } else {
+        // origianlly in ssd
+        if (size > THRESH + (THRESH >> 1)) {
+            // move to hdd
+            char hddpath[MAXPATH];
+            struct timesval timestamp;
+            gettimeofday(&timestamp, NULL);
+            // todo: seems no need to name it this way
+            spritnf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1),
+                        (unsigned int)timestamp.tv_sec,
+                        __sync_fetch_and_add(&count, 1));
+            res = rename(ssdpath, hddpath);
+            res = truncate(hddpath, size);
+            res = unlink(ssdpath);
+            res = symlink(strrchr(hddpath, '/') + 1, ssdpath);
+            // update xattr
+            struct stat st;
+            if ((res = lstat(hddpath, &st)) == -1) {
+                return -errno;
+            }
+            int fd;
+            if ((fd = open(xattrpath, O_WRONLY | O_CREAT)) < 0) {
+                return -errno;
+            }
+            if ((res = write(fd, &st, sizeof(st))) != sizeof(st)) {
+                close(fd);
+                return -errno;
+            }
+            close(fd);
+            return JK_SUCCESS;
+        } else {
+            // remains in ssd
+            res = truncate(ssdpath, size);
+            return JK_SUCCESS;
+        }
+    }
+
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
