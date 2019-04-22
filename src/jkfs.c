@@ -94,6 +94,7 @@ static int xattr2hdd(const char* ssdpath, char* hddpath) {
 }
 
 static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) {
+	fprintf(stdout, "jk_creat called\n");
     char ssdpath[MAXPATH];
     int res;
     res = path2ssd(path, ssdpath);
@@ -102,6 +103,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) 
         return -errno;
     }
     close(res);
+	fprintf(stdout, "jk_creat finished\n");
     return JK_SUCCESS;
 }
 
@@ -483,6 +485,8 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
 }
 
 static int jk_open(const char *path, struct fuse_file_info *fi) {
+
+	fprintf(stdout, "jk_open called\n");
     int res;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -495,6 +499,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
             return -errno;
         }
         fi->fh = fd;
+		fprintf(stdout, "jk_open finished\n");
         return fd;
     } else {
         int fd = open(ssdpath, fi->flags);
@@ -502,6 +507,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
             return -errno;
         }
         fi->fh = fd;
+		fprintf(stdout, "jk_open finished\n");
         return fd;
     }
 }
@@ -693,8 +699,7 @@ static struct fuse_operations jk_ops = {
 	.rmdir		= jk_rmdir,
 	// .rmlink		= jk_rmlink,
 	.symlink	= jk_symlink, 
-	.rename		= jk_rename,
-	// .link		= jk_link,
+	.rename		= jk_rename,// .link		= jk_link,
 	.chmod		= jk_chmod,
 	.chown		= jk_chown,
 	.truncate	= jk_truncate ,
