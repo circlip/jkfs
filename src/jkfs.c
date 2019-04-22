@@ -178,6 +178,12 @@ static int jk_opendir(const char *path, struct fuse_file_info *info) {
 	return JK_SUCCESS;
 }
 
+// fixme: 
+// warning: initialization from incompatible
+// pointer type [-Wincompatible-pointer-types]
+//        .readdir = jk_readdi,
+//                   ^~~~~~~~~
+//jkfs.c:710:13: ntoe: (near initialization for jk_ops.readdir)
 static int jk_readdir(const char *path, char *buf, 
 						fuse_fill_dir_t filler, off_t offset, 
 						struct fuse_file_info *fi) {
