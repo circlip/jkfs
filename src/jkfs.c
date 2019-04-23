@@ -184,7 +184,7 @@ static int jk_unlink(const char *path) {
     // if xattr exists
     if (res == 0) {
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         if (res != 0) {
             return -errno;
         }
@@ -254,7 +254,7 @@ static int jk_chmod(const char *path, mode_t mode) {
             return -errno;
         }
         char hddpath[MAXPATH];
-        if ((res = ssd2hdd(sddpath, hddpath)) == -1) {
+        if ((res = ssd2hdd(ssdpath, hddpath)) == -1) {
             return -errno;
         }
         if ((res = chmod(hddpath, mode)) == -1) {
@@ -287,7 +287,7 @@ static int jk_chown(const char* path, uid_t uid, gid_t gid) {
             return -errno;
         }
         char hddpath[MAXPATH];
-        if ((res = ssd2hdd(sddpath, hddpath)) == -1) {
+        if ((res = ssd2hdd(ssdpath, hddpath)) == -1) {
             return -errno;
         }
         if ((res = chown(hddpath, uid, gid)) == -1) {
@@ -318,7 +318,7 @@ static int jk_truncate(const char *path, off_t size) {
     if (res == 0) {
         // originally located in hdd
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         if (size < THRESH) {
             // move to ssd
             res = truncate(hddpath, size);
@@ -393,7 +393,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     res = ssd2xattr(ssdpath, xattrpath);
     if (res == 0) {
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         int fd = open(hddpath, fi->flags);
         if (fd < 0) {
             return -errno;
@@ -421,7 +421,7 @@ static int jk_read(const char *path, char *buf,
     res = ssd2xattr(ssdpath, xattrpath);
     if (res == 0) {
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         fd = open(hddpath, O_RDONLY);
         if (fd < 0) {
             return -errno;
@@ -497,7 +497,7 @@ static int jk_write(const char *path, const char *buf,
         // found xattr file : 
         // file is located in hdd
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         fd = open(hddpath, O_WRONLY);
         res = pwrite(fd, buf, size, offset);
         fi->fh = fd;
@@ -528,7 +528,7 @@ static int jk_write(const char *path, const char *buf,
 //     res = ssd2xattr(ssdpath, xattrpath);
 //     if (res == 0) {
 //         char hddpath[MAXPATH];
-//         res = ssd2hdd(sddpath, hddpath);
+//         res = ssd2hdd(ssdpath, hddpath);
 //         int fd = open(hddpath, fi->flags);
 //         if (fd < 0) {
 //             return -errno;
@@ -613,7 +613,7 @@ static int jk_write(const char *path, const char *buf,
 //         struct stat st;
 //         int ress, fdd;
 //         char hddpath[MAXPATH];
-//         res = ssd2hdd(sddpath, hddpath);
+//         res = ssd2hdd(ssdpath, hddpath);
 //         if ((ress = lstat(hddpath, &st)) == -1) {
 //             return -errno;
 //         } 
@@ -732,7 +732,7 @@ static int jk_access(const char *path, int mask) {
         // but somehow it is troublesome
         // obtain from exact file is simple but costly
         char hddpath[MAXPATH];
-        res = ssd2hdd(sddpath, hddpath);
+        res = ssd2hdd(ssdpath, hddpath);
         res = access(hddpath, mask);
         return res;
     }
