@@ -54,9 +54,9 @@ static int ssd2xattr(const char *ssdpath, char *xattrpath) {
         return -1;
     }
     // if is not a link
-    if (!S_ISLNK(st.st_mode)) {
-        return -1;
-    }
+//    if (!S_ISLNK(st.st_mode)) {
+//        return -1;
+//    }
     return JK_SUCCESS;
 }
 
@@ -353,10 +353,10 @@ static int jk_truncate(const char *path, off_t size) {
             char hddpath[MAXPATH];
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
-            // todo: seems no need to name it this way
-            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+            sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
                         (unsigned int)timestamp.tv_sec,
-                        __sync_fetch_and_add(&count, 1));
+                        __sync_fetch_and_add(&count, 1), 
+						strrchr(path, '/') + 1);
             res = rename(ssdpath, hddpath);
             res = truncate(hddpath, size);
             res = unlink(ssdpath);
@@ -452,20 +452,25 @@ static int jk_write(const char *path, const char *buf,
     if (res != 0) {
         // res != 0 means that xattr does not exist, file is located in ssd
         // fixme: file size not correct
-        if (offset + size > THRESH + (THRESH >> 1)) {
+		struct stat st;
+		res = lstat(ssdpath, &st);
+		if (res < 0) st.st_size = 0;
+		size_t filesize = (st.st_size > offset + size) ? st.st_size : offset + size;
+        if (filesize > THRESH + (THRESH >> 1)) {
             // should be move to hdd
 
             // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
             char hddpath[MAXPATH];
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
-            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+            sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
                         (unsigned int)timestamp.tv_sec,
-                        __sync_fetch_and_add(&count, 1));
+                        __sync_fetch_and_add(&count, 1), 
+						strrchr(path, '/') + 1);
             rename(ssdpath, hddpath);
             unlink(ssdpath);
             symlink(strrchr(hddpath, '/') + 1, ssdpath);
-            fd = open(hddpath, O_WRONLY);
+            fd = open(hddpath, O_WRONLY | O_CREAT, 0644);
             res = pwrite(fd, buf, size, offset);
             fi->fh = fd;
             close(fd);
@@ -486,7 +491,7 @@ static int jk_write(const char *path, const char *buf,
             return res;
 
         } else {
-            fd = open(ssdpath, O_WRONLY);
+            fd = open(ssdpath, O_WRONLY | O_CREAT);
             // remain in ssd
             res = pwrite(fd, buf, size, offset);
             fi->fh = fd;
@@ -578,9 +583,10 @@ static int jk_write(const char *path, const char *buf,
 //             struct timeval timestamp;
 //             gettimeofday(&timestamp, NULL);
 //             // todo: seems no need to name it this way
-//             sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
-//                         (unsigned int)timestamp.tv_sec,
-//                         __sync_fetch_and_add(&count, 1));
+            // sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
+            //             (unsigned int)timestamp.tv_sec,
+            //             __sync_fetch_and_add(&count, 1), 
+			// 			strrchr(path, '/') + 1);
 //             rename(ssdpath, hddpath);
 //             unlink(ssdpath);
 //             symlink(strrchr(hddpath, '/') + 1, ssdpath);
@@ -739,16 +745,15 @@ static int jk_access(const char *path, int mask) {
 }
 
 static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) {
-	fprintf(stdout, "jk_creat called\n");
     char ssdpath[MAXPATH];
     int res;
     res = path2ssd(path, ssdpath);
     res = creat(ssdpath, mode);
-    if (res == -1) {
+	// res = open(ssdpath, O_CREAT, mode);
+    if (res < 0) {
         return -errno;
     }
     close(res);
-	fprintf(stdout, "jk_creat finished\n");
     return JK_SUCCESS;
 }
 
