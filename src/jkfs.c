@@ -353,10 +353,10 @@ static int jk_truncate(const char *path, off_t size) {
             char hddpath[MAXPATH];
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
-            sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
+            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH,
+						strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
-                        __sync_fetch_and_add(&count, 1), 
-						strrchr(path, '/') + 1);
+                        __sync_fetch_and_add(&count, 1)); 
             res = rename(ssdpath, hddpath);
             res = truncate(hddpath, size);
             res = unlink(ssdpath);
@@ -456,21 +456,33 @@ static int jk_write(const char *path, const char *buf,
 		res = lstat(ssdpath, &st);
 		if (res < 0) st.st_size = 0;
 		size_t filesize = (st.st_size > offset + size) ? st.st_size : offset + size;
-        if (filesize > THRESH + (THRESH >> 1)) {
+
+        if (filesize > 10 * THRESH) {
             // should be move to hdd
 
             // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
             char hddpath[MAXPATH];
             struct timeval timestamp;
             gettimeofday(&timestamp, NULL);
-            sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
+            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH,
+						strrchr(path, '/') + 1,
                         (unsigned int)timestamp.tv_sec,
-                        __sync_fetch_and_add(&count, 1), 
-						strrchr(path, '/') + 1);
-            rename(ssdpath, hddpath);
+                        __sync_fetch_and_add(&count, 1)); 
+            // rename(ssdpath, hddpath);
+			// fixme: file failed to move from ssd to hdd through rename.
+			off_t write_offset = 0;
+			char write_buffer[131072];
+            fd = open(hddpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
+			int rfd = open(ssdpath, O_RDONLY);			
+			while ((res = pread(rfd, write_buffer, sizeof(write_buffer), write_offset)) != 0) {
+				res = pwrite(fd, write_buffer, res, write_offset);
+				write_offset += 131072;
+			}
+			close(rfd);
+
             unlink(ssdpath);
             symlink(strrchr(hddpath, '/') + 1, ssdpath);
-            fd = open(hddpath, O_WRONLY | O_CREAT, 0644);
+            // fd = open(hddpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
             res = pwrite(fd, buf, size, offset);
             fi->fh = fd;
             close(fd);
@@ -491,7 +503,7 @@ static int jk_write(const char *path, const char *buf,
             return res;
 
         } else {
-            fd = open(ssdpath, O_WRONLY | O_CREAT);
+            fd = open(ssdpath, O_WRONLY | O_CREAT, 0644);
             // remain in ssd
             res = pwrite(fd, buf, size, offset);
             fi->fh = fd;
@@ -583,10 +595,10 @@ static int jk_write(const char *path, const char *buf,
 //             struct timeval timestamp;
 //             gettimeofday(&timestamp, NULL);
 //             // todo: seems no need to name it this way
-            // sprintf(hddpath, "%s/%u%lu_%s", HDDPATH,
-            //             (unsigned int)timestamp.tv_sec,
-            //             __sync_fetch_and_add(&count, 1), 
-			// 			strrchr(path, '/') + 1);
+//             sprintf(hddpath, "%s/%s_%u%lu", HDDPATH,
+// 						strrchr(path, '/') + 1,
+//                         (unsigned int)timestamp.tv_sec,
+//                         __sync_fetch_and_add(&count, 1)); 
 //             rename(ssdpath, hddpath);
 //             unlink(ssdpath);
 //             symlink(strrchr(hddpath, '/') + 1, ssdpath);
@@ -698,13 +710,7 @@ static int jk_opendir(const char *path, struct fuse_file_info *info) {
 	return JK_SUCCESS;
 }
 
-// fixme: 
-// warning: initialization from incompatible
-// pointer type [-Wincompatible-pointer-types]
-//        .readdir = jk_readdi,
-//                   ^~~~~~~~~
-//jkfs.c:710:13: ntoe: (near initialization for jk_ops.readdir)
-static int jk_readdir(const char *path, char *buf, 
+static int jk_readdir(const char *path, void *buf, 
 						fuse_fill_dir_t filler, off_t offset, 
 						struct fuse_file_info *fi) {
 	int res = 0;
