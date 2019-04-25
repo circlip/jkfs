@@ -442,6 +442,7 @@ static int jk_read(const char *path, char *buf,
     return res;
 }
 
+// fixme: cannot write the first pwrite of a file in hdd
 static int jk_write(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
@@ -451,7 +452,6 @@ static int jk_write(const char *path, const char *buf,
     res = ssd2xattr(ssdpath, xattrpath);
     if (res != 0) {
         // res != 0 means that xattr does not exist, file is located in ssd
-        // fixme: file size not correct
 		struct stat st;
 		res = lstat(ssdpath, &st);
 		if (res < 0) st.st_size = 0;
