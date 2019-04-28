@@ -18,6 +18,7 @@
 #include <assert.h>
 #define JK_SUCCESS 0
 #define MAXPATH 256
+#define BUF_SIZE 131072
 static char SSDPATH[MAXPATH];
 static char HDDPATH[MAXPATH];
 static char MP[MAXPATH];
@@ -442,7 +443,6 @@ static int jk_read(const char *path, char *buf,
     return res;
 }
 
-// fixme: cannot write the first pwrite of a file in hdd
 static int jk_write(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
@@ -470,13 +470,15 @@ static int jk_write(const char *path, const char *buf,
                         __sync_fetch_and_add(&count, 1)); 
             // rename(ssdpath, hddpath);
 			// fixme: file failed to move from ssd to hdd through rename.
+            // so manually copy file through pread and pwrite
+            // BUF_SIZE = 131072 is in corespondace with the buffer size in system calls
 			off_t write_offset = 0;
-			char write_buffer[131072];
+			char write_buffer[BUF_SIZE];
             fd = open(hddpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
 			int rfd = open(ssdpath, O_RDONLY);			
 			while ((res = pread(rfd, write_buffer, sizeof(write_buffer), write_offset)) != 0) {
 				res = pwrite(fd, write_buffer, res, write_offset);
-				write_offset += 131072;
+				write_offset += BUF_SIZE;
 			}
 			close(rfd);
 
