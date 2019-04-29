@@ -58,7 +58,7 @@ static int jk_readlink(const char *path, char* buf, size_t size) {
 
 
 static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
-    char hhdpath[MAXPATH];
+    char hddpath[MAXPATH];
     path2hdd;
     int res;
     if (S_ISREG(mode)) {
@@ -127,9 +127,9 @@ static int jk_symlink(const char *path, const char *link) {
     return FJK_SUCCESS;
 }
 
-static int link(const char *path, const char *newpath) {
+static int jk_link(const char *path, const char *newpath) {
     int res;
-    int hddpath[MAXPATH], hddnewpath[MAXPATH];
+    char hddpath[MAXPATH], hddnewpath[MAXPATH];
     path2hdd;
     sprintf(hddnewpath, "%s%s", HDDPATH, newpath);
     res = link(hddpath, hddnewpath);
@@ -300,7 +300,7 @@ static int jk_removexattr(const char *path, const char *name) {
 }
 #endif /* HAVE_SETXATTR */
 
-static int jk_opendir(const char *path, struct fuse_file_info *info) {
+static int jk_opendir(const char *path, struct fuse_file_info *fi) {
     DIR *dp;
     int res = 0;
     char hddpath[MAXPATH];
@@ -364,7 +364,7 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
     int res;
     char hddpath[MAXPATH];
     path2hdd;
-    res = utimensat(0, ssdpath, ts, AT_SYMLINK_NOFOLLOW);
+    res = utimensat(0, hddpath, ts, AT_SYMLINK_NOFOLLOW);
     if (res == -1) {
         return -errno;
     }
