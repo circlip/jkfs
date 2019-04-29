@@ -79,10 +79,10 @@ static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
 
 static int jk_mkdir(const char *path, mode_t mode) {
     // easy. all happen in ssd
-    char ssdpath[MAXPATH];
+    char hddpath[MAXPATH];
+    path2hdd;
     int res;
-    sprintf(ssdpath, "%s%s", SSDPATH, path);
-    res = mkdir(ssdpath, mode);
+    res = mkdir(hddpath, mode);
     if (res == -1) {
         return -errno;
     }
@@ -219,7 +219,7 @@ static int jk_write(const char *path, const char *buf,
     int res, fd;
     char hddpath[MAXPATH];
     path2hdd;
-    fd = open(hddpath, O_WRONLY);
+    fd = open(hddpath, O_WRONLY | O_CREAT);
     if (fd < 0) {
         return -errno;
     }
