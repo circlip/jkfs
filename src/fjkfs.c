@@ -204,7 +204,7 @@ static int jk_read(const char *path, char *buf,
     char hddpath[MAXPATH];
     path2hdd;
     fd = open(hddpath, O_RDONLY);
-    res = pread(fi->fh, buf, size, offset);
+    res = pread(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }
@@ -223,7 +223,7 @@ static int jk_write(const char *path, const char *buf,
     if (fd < 0) {
         return -errno;
     }
-    res = pwrite(fi->fh, buf, size, offset);
+    res = pwrite(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }

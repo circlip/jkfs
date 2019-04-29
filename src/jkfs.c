@@ -457,7 +457,7 @@ static int jk_write(const char *path, const char *buf,
 		if (res < 0) st.st_size = 0;
 		size_t filesize = (st.st_size > offset + size) ? st.st_size : offset + size;
 
-        if (filesize > 10 * THRESH) {
+        if (filesize > THRESH) {
             // should be move to hdd
 
             // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
