@@ -442,7 +442,7 @@ static struct fuse_operations jk_ops = {
 	.read		= jk_read,
 	.write		= jk_write,
 	.statfs		= jk_statfs,
-	.flush		= jk_flush,
+	// .flush		= jk_flush,
 	.release	= jk_release,
 	.fsync		= jk_fsync,
 #ifdef HAVE_SETXATTR
