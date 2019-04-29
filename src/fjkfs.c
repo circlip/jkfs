@@ -154,6 +154,7 @@ static int jk_rename(const char *path, const char *newpath) {
 static int jk_chmod(const char *path, mode_t mode) {
     int res;
     char hddpath[MAXPATH];
+	path2hdd;
     res = chmod(hddpath, mode);
     if (res == -1) {
         return -errno;
@@ -164,6 +165,7 @@ static int jk_chmod(const char *path, mode_t mode) {
 static int jk_chown(const char* path, uid_t uid, gid_t gid) {
     int res;
     char hddpath[MAXPATH];
+	path2hdd;
     res = chown(hddpath, uid, gid);
     if (res == -1) {
         return -errno;
@@ -210,7 +212,7 @@ static int jk_read(const char *path, char *buf,
     }
     fi->fh = fd;
     close(fd);
-    return FJK_SUCCESS;
+    return res;
 }
 
 static int jk_write(const char *path, const char *buf, 
@@ -229,7 +231,7 @@ static int jk_write(const char *path, const char *buf,
     }
     fi->fh = fd;
     close(fd);
-    return FJK_SUCCESS;
+    return res;
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
@@ -444,7 +446,7 @@ static struct fuse_operations jk_ops = {
 	.statfs		= jk_statfs,
 	// .flush		= jk_flush,
 	.release	= jk_release,
-	.fsync		= jk_fsync,
+	// .fsync		= jk_fsync,
 #ifdef HAVE_SETXATTR
 	.setxattr	= jk_setxattr,
 	.getxattr	= jk_getxattr,
@@ -488,7 +490,7 @@ int main(int argc, char* argv[])
     fuse_opt_add_arg(&args, argv[0]);
     
     // read arguments, mainly ssdpath, hddpath, and mountpoint.
-    if (argc < 5) {
+    if (argc < 4) {
         read_args_from_file();
         if (argc == 2 && strncmp(argv[1], "-d", 2) == 0) 
             fuse_opt_add_arg(&args, "-d");
