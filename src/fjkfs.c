@@ -195,23 +195,25 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
         return -errno;
     }
     fi->fh = fd;
-    close(fd);
-    return FJK_SUCCESS;
+    // close(fd);
+    return fd;
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
-    int res, fd;
-    char hddpath[MAXPATH];
-    path2hdd;
-    fd = open(hddpath, O_RDONLY);
+//     int res, fd;
+//     char hddpath[MAXPATH];
+//     path2hdd;
+//     fd = open(hddpath, O_RDONLY);
+	int res, fd;
+	fd = fi->fh;
     res = pread(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }
-    fi->fh = fd;
-    close(fd);
+    // fi->fh = fd;
+    // close(fd);
     return res;
 }
 
@@ -219,18 +221,19 @@ static int jk_write(const char *path, const char *buf,
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
     int res, fd;
-    char hddpath[MAXPATH];
-    path2hdd;
-    fd = open(hddpath, O_WRONLY | O_CREAT);
-    if (fd < 0) {
-        return -errno;
-    }
+//     char hddpath[MAXPATH];
+//     path2hdd;
+//     fd = open(hddpath, O_WRONLY | O_CREAT);
+//     if (fd < 0) {
+//         return -errno;
+//     }
+	fd = fi->fh;
     res = pwrite(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }
-    fi->fh = fd;
-    close(fd);
+//     fi->fh = fd;
+//     close(fd);
     return res;
 }
 
