@@ -196,24 +196,18 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     }
     fi->fh = fd;
     // close(fd);
-    return fd;
+    return FJK_SUCCESS;
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
-//     int res, fd;
-//     char hddpath[MAXPATH];
-//     path2hdd;
-//     fd = open(hddpath, O_RDONLY);
 	int res, fd;
 	fd = fi->fh;
     res = pread(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }
-    // fi->fh = fd;
-    // close(fd);
     return res;
 }
 
@@ -221,19 +215,11 @@ static int jk_write(const char *path, const char *buf,
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
     int res, fd;
-//     char hddpath[MAXPATH];
-//     path2hdd;
-//     fd = open(hddpath, O_WRONLY | O_CREAT);
-//     if (fd < 0) {
-//         return -errno;
-//     }
 	fd = fi->fh;
     res = pwrite(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
     }
-//     fi->fh = fd;
-//     close(fd);
     return res;
 }
 
@@ -367,7 +353,7 @@ static int jk_access(const char *path, int mask) {
     return FJK_SUCCESS;
 }
 
-static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) {
+static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     char hddpath[MAXPATH];
     int res;
     path2hdd;
@@ -375,7 +361,8 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) 
     if (res < 0) {
         return -errno;
     }
-    close(res);
+	fi->fh = res;
+    // close(res);
     return FJK_SUCCESS;
 }
 
