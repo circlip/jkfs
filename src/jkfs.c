@@ -458,6 +458,27 @@ static int jk_write(const char *path, const char *buf,
 		// xattr does not exit. file is located in SSD
 		if (offset + size > THRESH) {
 			// should move to HDD
+            char hddapth[MAXPATH];
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            sprintf(hddpath, "%s%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+                    (unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
+            fd = fi->fh;
+            int fdd = open(hddpath, O_WRONLY | O_CREAT);
+            off_t tmp_offset = 0;
+            char tmp_buf[BUF_SIZE];
+
+            while ((res = pread(fd, &tmp_buf, sizeof(tmp_buf), tmp_offset)) != 0) {
+                res = pwrite(fdd, &tmp_buf, res, tmp_offset);
+                tmp_offset += BUF_SIZE;
+            }
+
+            close(fd);
+            fi->fh = fdd;
+
+            res = pwrite(fdd, buf, size, offset);
+            unlink(ssdpath);
+            symlink(strrchr(hddpath, '/') + 1, ssdpath);
 		} else {
 			// remains in SSD
 			fd = fi->fh;
@@ -468,10 +489,8 @@ static int jk_write(const char *path, const char *buf,
 		fd = fi->fh;
 		res = pwrite(fd, buf, size, offset);
 	}
+    return res;
 }
-
-
-
 
 static int jk_write2(const char *path, const char *buf, 
                     size_t size, off_t offset, 
