@@ -388,62 +388,88 @@ static int jk_truncate(const char *path, off_t size) {
 
 // fixme: stupid open read write!
 static int jk_open(const char *path, struct fuse_file_info *fi) {
-    int res;
+    int res, fd;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
     res = ssd2xattr(ssdpath, xattrpath);
     if (res == 0) {
+		// file located in hdd
         char hddpath[MAXPATH];
         res = ssd2hdd(ssdpath, hddpath);
-        int fd = open(hddpath, fi->flags);
+        fd = open(hddpath, fi->flags);
         if (fd < 0) {
             return -errno;
         }
-        fi->fh = fd;
-        close(fd);
-        return fd;
     } else {
-        int fd = open(ssdpath, fi->flags);
+		// file located in ssd
+        fd = open(ssdpath, fi->flags);
         if (fd < 0) {
             return -errno;
         }
-        fi->fh = fd;
-        close(fd);
-        return fd;
     }
+	fi->fh = fd;
+	return JK_SUCCESS;
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
     int res, fd;
-    char ssdpath[MAXPATH], xattrpath[MAXPATH];
-    res = path2ssd(path, ssdpath);
-    res = ssd2xattr(ssdpath, xattrpath);
-    if (res == 0) {
-        char hddpath[MAXPATH];
-        res = ssd2hdd(ssdpath, hddpath);
-        fd = open(hddpath, O_RDONLY);
-        if (fd < 0) {
-            return -errno;
-        }
-        fi->fh = fd;
-    } else {
-        fd = open(ssdpath, O_RDONLY);
-        if (fd < 0) {
-            return -errno;
-        }
-        fi->fh = fd;
-    }
-    res = pread(fd, buf, size, offset);
-    if (res == -1) {
-        return -errno;
-    }
-    close(fd);
-    return res;
+	fd = fi->fh;
+	res = pread(fd, buf, size, offset);
+	if (res < 0) {
+		return -errno;
+	}
+	return res;
 }
 
 static int jk_write(const char *path, const char *buf, 
+					size_t size, off_t offset,
+					struct fuse_file_info *fi) {
+	int res, fd;
+	char ssdpath[MAXPATH], xattrpath[MAXPATH];
+	res = path2ssd(path, ssdpath);
+	res = ssd2xattr(ssdpath, xattrpath);
+	if (res != 0) {
+		// no xattr: file located in ssd
+		if (offset + size > THRESH) {
+			// should move to hdd
+			char hddpath[MAXPATH];
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
+					(unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
+			int fdd;
+			fdd = open(hddpath, O_WRONLY | O_CREAT);
+			char cur_buf[BUF_SIZE];
+			off_t cur_off = 0;
+			while ((res = pread(fd, &cur_buf, sizeof(cur_buf), cur_off)) > 0) {
+				res = pwrite(fdd, &cur_buf, res, cur_off);
+				cur_off += BUF_SIZE;
+			} 
+			fi->fh = fdd;
+			close(fd);
+			fd = open(xattrpath, O_CREAT, 0644);
+			close(fd);
+			fd = fdd;
+			unlink(ssdpath);
+			symlink(strrchr(hddpath, '/') + 1, ssdpath);
+		} else {
+			// remain in ssd
+			fd = fi->fh;
+		}
+	} else {
+		// res == 0: file located in hdd
+		fd = fi->fh;
+	}
+	res = pwrite(fd, buf, size, offset);
+	if (res < 0) {
+		return -errno;
+	}
+	return res;
+}
+
+static int jk_write2(const char *path, const char *buf, 
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
     int res, fd;
@@ -540,123 +566,30 @@ static int jk_write(const char *path, const char *buf,
     }
 }
 
-// static int jk_open(const char *path, struct fuse_file_info *fi) {
-//     int res;
-//     char ssdpath[MAXPATH], xattrpath[MAXPATH];
-//     res = path2ssd(path, ssdpath);
-//     res = ssd2xattr(ssdpath, xattrpath);
-//     if (res == 0) {
-//         char hddpath[MAXPATH];
-//         res = ssd2hdd(ssdpath, hddpath);
-//         int fd = open(hddpath, fi->flags);
-//         if (fd < 0) {
-//             return -errno;
-//         }
-//         fi->fh = fd;
-//         return fd;
-//     } else {
-//         int fd = open(ssdpath, fi->flags);
-//         if (fd < 0) {
-//             return -errno;
-//         }
-//         fi->fh = fd;
-//         return fd;
-//     }
-// }
-// 
-// static int jk_read(const char *path, char *buf, 
-//                    size_t size, off_t offset, 
-//                    struct fuse_file_info *fi) {
-//     int res;
-//     res = pread(fi->fh, buf, size, offset);
-//     if (res == -1) {
-//         return -errno;
-//     }
-//     return res;
-// }
-// 
-// static int jk_write(const char *path, const char *buf, 
-//                     size_t size, off_t offset, 
-//                     struct fuse_file_info *fi) {
-//     int res;
-//     char ssdpath[MAXPATH], xattrpath[MAXPATH];
-//     res = path2ssd(path, ssdpath);
-//     res = ssd2xattr(ssdpath, xattrpath);
-//     if (res != 0) {
-//         // res != 0 means that xattr does not exist,
-//         // file is located in ssd
-//         if (offset + size > THRESH + (THRESH >> 1)) {
-//             // should be move to hdd
-// 
-//             // // write to ssd first
-//             // res = pwrite(fi->fh, buf, size, offset);
-//             close(fi->fh);
-// 
-//             // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
-//             char hddpath[MAXPATH];
-//             struct timeval timestamp;
-//             gettimeofday(&timestamp, NULL);
-//             // todo: seems no need to name it this way
-//             sprintf(hddpath, "%s/%s_%u%lu", HDDPATH,
-// 						strrchr(path, '/') + 1,
-//                         (unsigned int)timestamp.tv_sec,
-//                         __sync_fetch_and_add(&count, 1)); 
-//             rename(ssdpath, hddpath);
-//             unlink(ssdpath);
-//             symlink(strrchr(hddpath, '/') + 1, ssdpath);
-//             int fd = open(hddpath, O_WRONLY);
-//             res = pwrite(fd, buf, size, offset);
-//             fi->fh = fd;
-// 
-//             int ress, fdd;
-//             struct stat st;
-//             if ((ress = lstat(hddpath, &st)) == -1) {
-//                 return -errno;
-//             }
-//             if ((fdd = open(xattrpath, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) < 0) {
-//                 return -errno;
-//             }
-//             if ((ress = write(fdd, &st, sizeof(st))) != sizeof(st)) {
-//                 close(fdd);
-//                 return -errno;
-//             }
-//             close(fdd);
-//             return res;
-//         } else {
-//             // remain in ssd
-//             res = pwrite(fi->fh, buf, size, offset);
-//             return res;
-//         }
-//     } else {
-//         // file is located in hdd
-//         res = pwrite(fi->fh, buf, size, offset);
-//         struct stat st;
-//         int ress, fdd;
-//         char hddpath[MAXPATH];
-//         res = ssd2hdd(ssdpath, hddpath);
-//         if ((ress = lstat(hddpath, &st)) == -1) {
-//             return -errno;
-//         } 
-//         if ((fdd = open(xattrpath, O_WRONLY)) < 0) {
-//             return -errno;
-//         }
-//         if ((ress = write(fdd, &st, sizeof(st))) != sizeof(st)) {
-//             close(fdd);
-//             return -errno;
-//         }
-//         close(fdd);
-//         return res;
-//     }
-// }
-
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
     fprintf(stderr, "Not implemented yet.\n");
     return -1;
 }
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
-    (void) path;
-    close(fi->fh);
+	char ssdpath[MAXPATH], xattrpath[MAXPATH];
+	int res;
+	res = path2ssd(path, ssdpath);
+	res = ssd2xattr(ssdpath, xattrpath);
+	if (res == 0) {
+		// file located in hdd, should create xattr
+		char hddpath[MAXPATH];
+		struct stat st;
+		res = ssd2hdd(ssdpath, hddpath);
+		res = lstat(hddpath, &st);
+		int fd = open(xattrpath, O_WRONLY | O_CREAT);
+		res = write(fd, &st, sizeof(st));
+		close(fd);
+		close(fi->fh);
+	} else {
+		// file located in ssd, need to do nothing
+		close(fi->fh);
+	}
     return JK_SUCCESS;
 }
 
@@ -752,7 +685,7 @@ static int jk_access(const char *path, int mask) {
     }
 }
 
-static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) {
+static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     char ssdpath[MAXPATH];
     int res;
     res = path2ssd(path, ssdpath);
@@ -761,7 +694,8 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *info) 
     if (res < 0) {
         return -errno;
     }
-    close(res);
+	fi->fh = res;
+    // close(res);
     return JK_SUCCESS;
 }
 
