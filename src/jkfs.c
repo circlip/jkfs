@@ -18,7 +18,7 @@
 #include <assert.h>
 #define JK_SUCCESS 0
 #define MAXPATH 256
-#define BUF_SIZE 131072 
+#define BUF_SIZE 131072
 static char SSDPATH[MAXPATH];
 static char HDDPATH[MAXPATH];
 static char MP[MAXPATH];
@@ -439,11 +439,11 @@ static int jk_write(const char *path, const char *buf,
 			sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
 					(unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
 			int fdd;
-			fdd = open(hddpath, O_WRONLY, 0644);
+			fdd = open(hddpath, O_WRONLY | O_CREAT, 0644);
 			char cur_buf[BUF_SIZE];
 			off_t cur_off = 0;
 			fd = fi->fh;
-			while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) != 0) {
+			while ((res = pread(fd, cur_buf, sizeof(cur_buf), cur_off)) > 0) {
 				res = pwrite(fdd, cur_buf, res, cur_off);
 				cur_off += BUF_SIZE;
 			} 
