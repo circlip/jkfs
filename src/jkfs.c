@@ -443,7 +443,7 @@ static int jk_write(const char *path, const char *buf,
 			char cur_buf[BUF_SIZE];
 			off_t cur_off = 0;
 			fd = fi->fh;
-			while ((res = pread(fd, cur_buf, sizeof(cur_buf), cur_off)) > 0) {
+			while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
 				res = pwrite(fdd, cur_buf, res, cur_off);
 				cur_off += BUF_SIZE;
 			} 
@@ -696,7 +696,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     }
 	fi->fh = res;
     // close(res);
-    return JK_SUCCESS;
+    return res;
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
