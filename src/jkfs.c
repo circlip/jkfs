@@ -499,13 +499,13 @@ static int jk_write(const char *path, const char *buf,
 			fprintf(dfp, "%s: file not large, remains in ssd\n", path);
 #endif
 			fd = (int)fi->fh;
-			fd = realfd[fd];
 		}
 	} else {
 #ifdef debug
 		fprintf(dfp, "%s: xattr exists, already located in hdd\n", xattrpath);
 #endif
 		fd = (int)fi->fh;
+		fd = realfd[fd];
 	}
 #ifdef debug
 	fprintf(dfp, "current fd is %d\n", fd);
@@ -751,8 +751,8 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     char ssdpath[MAXPATH];
     int res, fd;
     res = path2ssd(path, ssdpath);
-    // fd = creat(ssdpath, mode);
-	fd = open(ssdpath, O_CREAT | O_WRONLY, mode);
+    fd = creat(ssdpath, mode);
+	// fd = open(ssdpath, O_CREAT | O_WRONLY, mode);
 #ifdef debug
 	fprintf(dfp, "%s created in ssd, and the file descriptor is %d\n", ssdpath, fd);
 #endif
