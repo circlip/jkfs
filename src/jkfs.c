@@ -123,7 +123,13 @@ static int jk_getattr(const char *path, struct stat *stbuf) {
             return -errno;
         }
         res = read(fd, stbuf, sizeof(*stbuf));
-        if (res != sizeof(*stbuf)) {
+		if (res == 0) {
+			char hddpath[MAXPATH];
+			res = ssd2hdd(ssdpath, hddpath);
+			res = lstat(hddpath, stbuf);
+			if (res != 0) 
+				return -errno;
+		} else if (res != sizeof(*stbuf)) {
             close(fd);
             return -errno;
         }
@@ -452,11 +458,11 @@ static int jk_write(const char *path, const char *buf,
 #endif
 	if (res != 0) {
 #ifdef debug
-		fprintf(dfp, "%s: no xattr: file originally located in ssd\n", path);
+// 		fprintf(dfp, "%s: no xattr: file originally located in ssd\n", path);
 #endif
-		if (offset + size > THRESH) {
+ 		if (offset + size > THRESH) {
 #ifdef debug
-			fprintf(dfp, "%s: file too large: should be move to hdd\n", path);
+//			fprintf(dfp, "%s: file too large: should be move to hdd\n", path);
 #endif
 			char hddpath[MAXPATH];
 			struct timeval tv;
@@ -464,12 +470,12 @@ static int jk_write(const char *path, const char *buf,
 			sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
 					(unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
 #ifdef debug
-			fprintf(dfp, "%s: hddpath decided.\n", hddpath);
+//			fprintf(dfp, "%s: hddpath decided.\n", hddpath);
 #endif
 			int fdd;
 			fdd = open(hddpath, O_WRONLY | O_CREAT, 0644);
 #ifdef debug
-			fprintf(dfp, "%s: file descriptor is %d\n", hddpath, fdd);
+//			fprintf(dfp, "%s: file descriptor is %d\n", hddpath, fdd);
 #endif
 			char cur_buf[BUF_SIZE];
 			off_t cur_off = 0;
@@ -478,37 +484,37 @@ static int jk_write(const char *path, const char *buf,
 			close(fd);
 			fd = open(ssdpath, O_RDONLY);
 #ifdef debug
-			fprintf(dfp, "......starting copying from ssd to hdd...\n");
+//			fprintf(dfp, "......starting copying from ssd to hdd...\n");
 #endif
 			while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
 #ifdef debug
-				fprintf(dfp, "\tpread: fd=%d, size=%d, offset=%ld, ==> %d\n", fd, BUF_SIZE, cur_off, res);
+//				fprintf(dfp, "\tpread: fd=%d, size=%d, offset=%ld, ==> %d\n", fd, BUF_SIZE, cur_off, res);
 #endif
 				res = pwrite(fdd, cur_buf, res, cur_off);
 #ifdef debug
-				fprintf(dfp, "\tpwrite: fd=%d, size=%d, offset=%ld, ==> %d\n", fdd, 0, cur_off, res);
+//				fprintf(dfp, "\tpwrite: fd=%d, size=%d, offset=%ld, ==> %d\n", fdd, 0, cur_off, res);
 #endif
 				cur_off += BUF_SIZE;
 			} 
 			close(fd);
 			realfd[fd] = fdd;
 #ifdef debug
-			fprintf(dfp, "%s: finished copying file from ssd to hdd.\n", hddpath);
+//			fprintf(dfp, "%s: finished copying file from ssd to hdd.\n", hddpath);
 #endif
 			fd = open(xattrpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
 			close(fd);
 #ifdef debug
-			fprintf(dfp, "%s, xattr created and the file descriptor was %d\n", xattrpath, fd);
+//			fprintf(dfp, "%s, xattr created and the file descriptor was %d\n", xattrpath, fd);
 #endif
 			unlink(ssdpath);
 			symlink(strrchr(hddpath, '/') + 1, ssdpath);
 #ifdef debug
-			fprintf(dfp, "created link: %s -> %s\n", ssdpath, hddpath);
+//			fprintf(dfp, "created link: %s -> %s\n", ssdpath, hddpath);
 #endif
 			fd = fdd;
 		} else {
 #ifdef debug
-			fprintf(dfp, "%s: file not large, remains in ssd\n", path);
+//			fprintf(dfp, "%s: file not large, remains in ssd\n", path);
 #endif
 			fd = (int)fi->fh;
 		}
@@ -520,14 +526,14 @@ static int jk_write(const char *path, const char *buf,
 		fd = realfd[fd];
 	}
 #ifdef debug
-	fprintf(dfp, "current fd is %d\n", fd);
+//	fprintf(dfp, "current fd is %d\n", fd);
 #endif
 	res = pwrite(fd, buf, size, offset);
 	if (res < 0) {
 		return -errno;
 	}
 #ifdef debug
-	fprintf(dfp, "%d bytes written, current fd is %d\n", res, fd);
+//	fprintf(dfp, "%d bytes written, current fd is %d\n", res, fd);
 	end
 #endif
 	return res;
@@ -779,6 +785,10 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
+#ifdef debug
+	strcpy(name, "jk_utimens");
+	start
+#endif
     int res;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -786,12 +796,24 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
     if (res == 0) {
         struct stat stbuf;
         int fd;
-        if ((fd = open(xattrpath, O_RDWR)) < 0) {
-            return -errno;
-        }
-        if ((res = read(fd, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
-            return -errno;
-        }
+		fd = open(xattrpath, O_RDWR);
+        // if ((fd = open(xattrpath, O_RDWR | O_CREAT)) < 0) {
+        //     return -errno;
+        // }
+		res = read(fd, &stbuf, sizeof(stbuf));
+		if (res == 0) {
+			char hddpath[MAXPATH];
+			res = ssd2hdd(ssdpath, hddpath);
+			res = utimensat(0, hddpath, ts, AT_SYMLINK_NOFOLLOW);
+			if (res == -1) {
+				return -errno;
+			}
+			close(fd);
+			return JK_SUCCESS;
+		}
+		// if ((res = read(fd, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
+        //     return -errno;
+        // }
         memcpy(&(stbuf.st_atime), ts, sizeof(*ts));
         memcpy(&(stbuf.st_mtime), ts + 1, sizeof(*ts));
         if ((res = write(fd, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
@@ -799,12 +821,19 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
             return -errno;
         }
         close(fd);
+#ifdef debug
+		end
+#endif
         return JK_SUCCESS;
     } else {
         res = utimensat(0, ssdpath, ts, AT_SYMLINK_NOFOLLOW);
         if (res == -1) {
             return -errno;
         }
+#ifdef debug
+		fprintf(dfp, "hit here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+		end
+#endif
         return JK_SUCCESS;
     }
 }
