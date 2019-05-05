@@ -1,0 +1,22 @@
+
+### jk_creat: /file 
+/mnt/jk_ssd/file created in ssd, and the file descriptor is 6
+### end of jk_creat
+
+### jk_creat: /file4 
+/mnt/jk_ssd/file4 created in ssd, and the file descriptor is 7
+### end of jk_creat
+
+### jk_write: /file4 
+fd is 7
+/file4: deciding where to write in... 
+/file4: no xattr: file originally located in ssd
+/file4: file not large, remains in ssd
+current fd is -1
+
+### jk_write: /file 
+fd is 6
+/file: deciding where to write in... 
+/file: no xattr: file originally located in ssd
+/file: file not large, remains in ssd
+current fd is -1
