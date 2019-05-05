@@ -1,5 +1,5 @@
 #define FUSE_USE_VERSION 29 
-#define _GNU_SOURCE
+#define _GNU_SOURCE 500
 #include <fuse.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -474,8 +474,20 @@ static int jk_write(const char *path, const char *buf,
 			char cur_buf[BUF_SIZE];
 			off_t cur_off = 0;
 			fd = (int)fi->fh;
-			while ((res = pread(fd, cur_buf, BUF_SIZE * sizeof(char), cur_off)) > 0) {
+			// note: the ssd file was WRONLY, so it should be closed and re-open 
+			close(fd);
+			fd = open(ssdpath, O_RDONLY);
+#ifdef debug
+			fprintf(dfp, "......starting copying from ssd to hdd...\n");
+#endif
+			while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
+#ifdef debug
+				fprintf(dfp, "\tpread: fd=%d, size=%d, offset=%ld, ==> %d\n", fd, BUF_SIZE, cur_off, res);
+#endif
 				res = pwrite(fdd, cur_buf, res, cur_off);
+#ifdef debug
+				fprintf(dfp, "\tpwrite: fd=%d, size=%d, offset=%ld, ==> %d\n", fdd, 0, cur_off, res);
+#endif
 				cur_off += BUF_SIZE;
 			} 
 			close(fd);
