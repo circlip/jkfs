@@ -542,7 +542,7 @@ static int jk_read(const char *path, char *buf,
 	return res;
 }
 
-static int jk_write(const char *path, const char *buf
+static int jk_write(const char *path, const char *buf,
 					size_t size, off_t offset,
 					struct fuse_file_info *fi) {
 #ifdef debug
