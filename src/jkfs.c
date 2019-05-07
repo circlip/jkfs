@@ -57,17 +57,15 @@ static int ssd2xattr(const char *ssdpath, char *xattrpath) {
     int res;
     struct stat st;
     res = stat(xattrpath, &st);
-    // if not exists
     if (res == -1) {
         return -1;
     }
-    // if is not a link
-//    if (!S_ISLNK(st.st_mode)) {
-//        return -1;
-//    }
     return JK_SUCCESS;
 }
 
+/**
+* find ssdpath which is a regular file
+*/
 // todo: some need deep and some does not. REVIEW ALL !!!
 static int path2ssd_deep(const char *path, char *ssdpath) {
     strcpy(ssdpath, SSDPATH);
@@ -100,6 +98,10 @@ static int ssd2hdd(const char* ssdpath, char* hddpath) {
 }
 
 static int jk_getattr(const char *path, struct stat *stbuf) {
+#ifdef debug
+	strcpy(name, "jk_getattr");
+	start
+#endif
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     int res;
     res = path2ssd(path, ssdpath);
@@ -116,6 +118,9 @@ static int jk_getattr(const char *path, struct stat *stbuf) {
         if (res == -1) {
             return -errno;
         }
+#ifdef debug
+	end
+#endif
         return JK_SUCCESS;
     } else {
         int fd = open(xattrpath, O_RDONLY);
@@ -134,6 +139,9 @@ static int jk_getattr(const char *path, struct stat *stbuf) {
             return -errno;
         }
         close(fd);
+#ifdef debug
+	end
+#endif
         return JK_SUCCESS;
     }
 }
@@ -142,6 +150,10 @@ static int jk_getattr(const char *path, struct stat *stbuf) {
 * read symlink only, regardless of xattr file
 */
 static int jk_readlink(const char *path, char* buf, size_t size) {
+#ifdef debug
+	strcpy(name, "jk_readlink");
+	start
+#endif
     char ssdpath[MAXPATH];
     sprintf(ssdpath, "%s%s", SSDPATH, path);
     int res;
@@ -150,10 +162,17 @@ static int jk_readlink(const char *path, char* buf, size_t size) {
         return -errno;
     }
     buf[res] = 0;
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
+#ifdef debug
+	strcpy(name, "jk_mknod");
+	start
+#endif
     char ssdpath[MAXPATH];
     path2ssd(path, ssdpath);
     int res;
@@ -170,10 +189,17 @@ static int jk_mknod(const char *path, mode_t mode, dev_t rdev) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_mkdir(const char *path, mode_t mode) {
+#ifdef debug
+	strcpy(name, "jk_mkdir");
+	start
+#endif
     // easy. all happen in ssd
     char ssdpath[MAXPATH];
     int res;
@@ -182,6 +208,9 @@ static int jk_mkdir(const char *path, mode_t mode) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
@@ -189,6 +218,10 @@ static int jk_mkdir(const char *path, mode_t mode) {
 * this remove a file
 */
 static int jk_unlink(const char *path) {
+#ifdef debug
+	strcpy(name, "jk_unlink");
+	start
+#endif
     // to ensure concurrency, 
     // unlink hddpath first(if exists), and ssdpath lastly
     int res;
@@ -209,10 +242,17 @@ static int jk_unlink(const char *path) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_rmdir(const char *path) { 
+#ifdef debug
+	strcpy(name, "jk_rmdir");
+	start
+#endif
     // easy. all happen in ssdpath
     char ssdpath[MAXPATH];
     int res;
@@ -221,12 +261,19 @@ static int jk_rmdir(const char *path) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 // the path is where the link points to
 // which is in accordance with the system call
 static int jk_symlink(const char *path, const char *link) {
+#ifdef debug
+	strcpy(name, "jk_symlink");
+	start
+#endif
     int res;
     char ssdlink[MAXPATH];
     res = path2ssd(link, ssdlink);
@@ -234,10 +281,17 @@ static int jk_symlink(const char *path, const char *link) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_rename(const char *path, const char *newpath) {
+#ifdef debug
+	strcpy(name, "jk_rename");
+	start
+#endif
     int res;
     char ssdpath[MAXPATH], ssdnewpath[MAXPATH];
     char xattrpath[MAXPATH], xattrnewpath[MAXPATH];
@@ -255,10 +309,17 @@ static int jk_rename(const char *path, const char *newpath) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_chmod(const char *path, mode_t mode) {
+#ifdef debug
+	strcpy(name, "jk_chmod");
+	start
+#endif
     int res;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -288,10 +349,17 @@ static int jk_chmod(const char *path, mode_t mode) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;  
 }
 
 static int jk_chown(const char* path, uid_t uid, gid_t gid) {
+#ifdef debug
+	strcpy(name, "jk_chown");
+	start
+#endif
     int res;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -321,10 +389,17 @@ static int jk_chown(const char* path, uid_t uid, gid_t gid) {
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;  
 } 
 
 static int jk_truncate(const char *path, off_t size) {
+#ifdef debug
+	strcpy(name, "jk_truncate");
+	start
+#endif
     int res;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd_deep(path, ssdpath);
@@ -340,6 +415,9 @@ static int jk_truncate(const char *path, off_t size) {
             res = rename(hddpath, ssdpath);
             unlink(hddpath);
             unlink(xattrpath);
+#ifdef debug
+	end
+#endif
             return JK_SUCCESS;
         } else {
             // remain in hdd
@@ -358,6 +436,9 @@ static int jk_truncate(const char *path, off_t size) {
                 return -errno;
             }
             close(fd);
+#ifdef debug
+	end
+#endif
             return JK_SUCCESS;
         }
     } else {
@@ -389,10 +470,16 @@ static int jk_truncate(const char *path, off_t size) {
                 return -errno;
             }
             close(fd);
+#ifdef debug
+	end
+#endif
             return JK_SUCCESS;
         } else {
             // remains in ssd
             res = truncate(ssdpath, size);
+#ifdef debug
+	end
+#endif
             return JK_SUCCESS;
         }
     }
@@ -400,6 +487,10 @@ static int jk_truncate(const char *path, off_t size) {
 }
 
 static int jk_open(const char *path, struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_open");
+	start
+#endif
     int res, fd;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -420,12 +511,19 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
         }
     }
 	fi->fh = fd;
+#ifdef debug
+	end
+#endif
 	return JK_SUCCESS;
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_read");
+	start
+#endif
     int res, fd;
 	char ssdpath[MAXPATH], xattrpath[MAXPATH];
 	res = path2ssd(path, ssdpath);
@@ -438,10 +536,13 @@ static int jk_read(const char *path, char *buf,
 	if (res < 0) {
 		return -errno;
 	}
+#ifdef debug
+	end
+#endif
 	return res;
 }
 
-static int jk_write(const char *path, const char *buf, 
+static int jk_write(const char *path, const char *buf
 					size_t size, off_t offset,
 					struct fuse_file_info *fi) {
 #ifdef debug
@@ -637,11 +738,19 @@ static int jk_write2(const char *path, const char *buf,
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {
+#ifdef debug
+	strcpy(name, "jk_statfs");
+	start
+#endif
     fprintf(stderr, "Not implemented yet.\n");
     return -1;
 }
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_release");
+	start
+#endif
 	char ssdpath[MAXPATH], xattrpath[MAXPATH];
 	int res;
 	res = path2ssd(path, ssdpath);
@@ -666,14 +775,24 @@ static int jk_release(const char *path, struct fuse_file_info *fi) {
 		// file located in ssd, need to do nothing
 		close((int)fi->fh);
 	}
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_fsync(const char *path, int isdatasync,
                     struct fuse_file_info *fi) {
     // todo:
+#ifdef debug
+	strcpy(name, "jk_fsync");
+	start
+#endif
     (void) path;
     (void) fi;
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
@@ -682,48 +801,87 @@ static int jk_fsync(const char *path, int isdatasync,
 #ifdef HAVE_SETXATTR
 static int jk_setxattr(const char *path, const char *name, const char *value, 
                        size_t size, int flag) {
+#ifdef debug
+	strcpy(name, "jk_setxattr");
+	start
+#endif
     int res = lsetxattr(path, name, value, size, flag);
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_getxattr(const char *path, const char *name, char *value, size_t size) {
+#ifdef debug
+	strcpy(name, "jk_getxattr");
+	start
+#endif
     int res = lgetxattr(path, name, value, size);
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_listxattr(const char *path, char *list, size_t size) {
+#ifdef debug
+	strcpy(name, "jk_listxattr");
+	start
+#endif
     int res = llistxattr(path, list, size);
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
 static int jk_removexattr(const char *path, const char *name) {
+#ifdef debug
+	strcpy(name, "jk_removexattr");
+	start
+#endif
     int res = lremovexattr(path, name);
     if (res == -1) {
         return -errno;
     }
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 #endif /* HAVE_SETXATTR */
 
 static int jk_opendir(const char *path, struct fuse_file_info *info) {
+#ifdef debug
+	strcpy(name, "jk_opendir");
+	start
+#endif
 	char ssdpath[MAXPATH];
     path2ssd(path, ssdpath);
 	info->fh = (intptr_t)opendir(ssdpath);
+#ifdef debug 
+	end
+#endif
 	return JK_SUCCESS;
 }
 
 static int jk_readdir(const char *path, void *buf, 
 						fuse_fill_dir_t filler, off_t offset, 
 						struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_readdir");
+	start
+#endif
 	int res = 0;
 	DIR *dp;
 	struct dirent *de;
@@ -739,16 +897,26 @@ static int jk_readdir(const char *path, void *buf,
 		}	
 	}	
 	closedir(dp);
+#ifdef debug
+	end
+#endif
 	return JK_SUCCESS;
 }
 
 static int jk_access(const char *path, int mask) {
+#ifdef debug
+	strcpy(name, "jk_access");
+	start
+#endif
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     int res;
     res = path2ssd(path, ssdpath);
     res = ssd2xattr(ssdpath, xattrpath);
     if (res == -1) {
         res = access(ssdpath, mask);
+#ifdef debug
+		end
+#endif
         return res;
     } else {
         // fixme: stupid access: it seems better to read the xattr file to find out.
@@ -757,6 +925,9 @@ static int jk_access(const char *path, int mask) {
         char hddpath[MAXPATH];
         res = ssd2hdd(ssdpath, hddpath);
         res = access(hddpath, mask);
+#ifdef debug
+		end
+#endif
         return res;
     }
 }
@@ -842,6 +1013,10 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
 static int jk_fallocate(const char *path, int mode, 
                         off_t offset, off_t length, 
                         struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_fallocate");
+	start
+#endif
     int fd, res;
     (void) fi;
     if (mode) {
@@ -853,12 +1028,19 @@ static int jk_fallocate(const char *path, int mode,
     }
     res = posix_fallocate(fd, offset, length);
     close(fd);
+#ifdef debug
+	end
+#endif
     return -res;
 }
 #else
 static int jk_fallocate(const char *path, int mode, 
                         off_t offset, off_t length,
                         struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_fallocate");
+	start
+#endif
     int fd, res;
     (void) fi;
     fd = jk_open(path, fi);
@@ -870,6 +1052,9 @@ static int jk_fallocate(const char *path, int mode,
         return -errno;
     }
     close(fd);
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 #endif /* HAVE_POSIX_FALLOCATE */
