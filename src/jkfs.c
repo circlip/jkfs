@@ -431,9 +431,9 @@ static int jk_read(const char *path, char *buf,
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
 	fd = (int)fi->fh;
-	if (res == 0 && realfd[fd] >= 0) {
-		fd = realfd[fd];
-	}
+// 	if (res == 0 && realfd[fd] >= 0) {
+// 		fd = realfd[fd];
+// 	}
 	res = pread(fd, buf, size, offset);
 	if (res < 0) {
 		return -errno;
@@ -450,7 +450,7 @@ static int jk_write(const char *path, const char *buf,
 	fprintf(dfp, "fd is %d\n", (int)fi->fh);
 #endif
 	int res, fd;
-	char ssdpath[MAXPATH], xattrpath[MAXPATH];
+	char ssdpath[MAXPATH], xattrpath[MAXPATH], hddpath[MAXPATH];
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
 #ifdef debug
@@ -464,7 +464,6 @@ static int jk_write(const char *path, const char *buf,
 #ifdef debug
 //			fprintf(dfp, "%s: file too large: should be move to hdd\n", path);
 #endif
-			char hddpath[MAXPATH];
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
 			sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
@@ -523,10 +522,18 @@ static int jk_write(const char *path, const char *buf,
 		fprintf(dfp, "%s: xattr exists, already located in hdd\n", xattrpath);
 #endif
 		fd = (int)fi->fh;
-		fd = realfd[fd];
+		int fdd = realfd[fd];
+		if (fdd == -1) {
+			ssd2hdd(ssdpath, hddpath);
+			fdd = open(hddpath, O_WRONLY);
+			realfd[fd] = fdd;
+			fd = fdd;
+		} else {
+			fd = realfd[fd];
+		}
 	}
 #ifdef debug
-//	fprintf(dfp, "current fd is %d\n", fd);
+	fprintf(dfp, "current fd is %d\n", fd);
 #endif
 	res = pwrite(fd, buf, size, offset);
 	if (res < 0) {
