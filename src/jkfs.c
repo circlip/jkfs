@@ -426,6 +426,11 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_read");
+	start
+	fprintf(dfp, "fd is %d\n", (int)fi->fh);
+#endif
     int res, fd;
 	char ssdpath[MAXPATH], xattrpath[MAXPATH];
 	res = path2ssd(path, ssdpath);
@@ -438,6 +443,9 @@ static int jk_read(const char *path, char *buf,
 	if (res < 0) {
 		return -errno;
 	}
+#ifdef debuf
+	end
+#endif
 	return res;
 }
 
@@ -533,6 +541,7 @@ static int jk_write(const char *path, const char *buf,
 		}
 	}
 #ifdef debug
+	fd = (int)fd;
 	fprintf(dfp, "current fd is %d\n", fd);
 #endif
 	res = pwrite(fd, buf, size, offset);
@@ -649,6 +658,11 @@ static int jk_statfs(const char *path, struct statvfs *statbuf) {
 }
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_release");
+	start
+	fprintf(dfp, "fd is %d\n", (int)fi->fh);
+#endif
 	char ssdpath[MAXPATH], xattrpath[MAXPATH];
 	int res;
 	res = path2ssd(path, ssdpath);
@@ -667,12 +681,21 @@ static int jk_release(const char *path, struct fuse_file_info *fi) {
 		fd = (int)fi->fh;
 		fd = realfd[fd];
 		close(fd);
+#ifdef debug
+		fprintf(dfp, "hdd file %d closed\n", fd);
+#endif
 		fd = (int)fi->fh;
 		realfd[fd] = -1;
 	} else {
 		// file located in ssd, need to do nothing
 		close((int)fi->fh);
+#ifdef debug
+		fprintf(dfp, "ssd file %ld closed\n", fi->fh);
+#endif
 	}
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
