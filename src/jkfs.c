@@ -23,7 +23,7 @@ static char SSDPATH[MAXPATH];
 static char HDDPATH[MAXPATH];
 static char MP[MAXPATH];
 static size_t THRESH;
-static int realfd[128];
+static int realfd[1024];
 static unsigned long count = 0;
 
 #define debug 11
@@ -462,7 +462,7 @@ static int jk_write(const char *path, const char *buf,
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
 #ifdef debug
-	fprintf(dfp, "%s: deciding where to write in... \n", path);
+	// fprintf(dfp, "%s: deciding where to write in... \n", path);
 #endif
 	if (res != 0) {
 #ifdef debug
@@ -968,7 +968,7 @@ int main(int argc, char* argv[])
 {
     struct fuse_args args = FUSE_ARGS_INIT(0, NULL);
     fuse_opt_add_arg(&args, argv[0]);
-	for (int i = 0; i < 128; i++) {
+	for (int i = 0; i < 1024; i++) {
 		realfd[i] = -1;
 	}
 #ifdef debug
