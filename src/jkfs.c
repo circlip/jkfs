@@ -816,6 +816,9 @@ static int jk_utimens(const char *path, const struct timespec ts[2]){
 				return -errno;
 			}
 			close(fd);
+#ifdef debug
+			end
+#endif
 			return JK_SUCCESS;
 		}
 		// if ((res = read(fd, &stbuf, sizeof(stbuf))) != sizeof(stbuf)) {
