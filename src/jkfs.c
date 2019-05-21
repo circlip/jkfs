@@ -26,7 +26,7 @@ static size_t THRESH;
 static int realfd[128];
 static unsigned long count = 0;
 
-#define debug 11
+//#define debug 11
 
 #ifdef debug
 #define start {dfp = fopen(debugpath, "a+"); fprintf(dfp, "\n### %s: %s \n", name, path);}
@@ -400,6 +400,10 @@ static int jk_truncate(const char *path, off_t size) {
 }
 
 static int jk_open(const char *path, struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_open");
+	start
+#endif
     int res, fd;
     char ssdpath[MAXPATH], xattrpath[MAXPATH];
     res = path2ssd(path, ssdpath);
@@ -414,12 +418,16 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
         }
     } else {
 		// file located in ssd
-        fd = open(ssdpath, fi->flags | O_RDWR);
+        fd = open(ssdpath, fi->flags);
         if (fd < 0) {
             return -errno;
         }
     }
 	fi->fh = fd;
+#ifdef debug
+	fprintf(dfp, "fd is %d\n", (int)fi->fh);
+	end
+#endif
 	return JK_SUCCESS;
 }
 
@@ -453,9 +461,6 @@ static int jk_write(const char *path, const char *buf,
 	char ssdpath[MAXPATH], xattrpath[MAXPATH], hddpath[MAXPATH];
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
-#ifdef debug
-	fprintf(dfp, "%s: deciding where to write in... \n", path);
-#endif
 	if (res != 0) {
 #ifdef debug
 // 		fprintf(dfp, "%s: no xattr: file originally located in ssd\n", path);
@@ -476,8 +481,15 @@ static int jk_write(const char *path, const char *buf,
 #ifdef debug
 //			fprintf(dfp, "%s: file descriptor is %d\n", hddpath, fdd);
 #endif
-			char cur_buf[BUF_SIZE];
+			char cur_buf[THRESH];
 			off_t cur_off = 0;
+			fd = open(ssdpath, O_RDONLY);
+			res = read(fd, cur_buf, THRESH);
+#ifdef debug
+			fprintf(dfp, "%d bits read from ssd file\n", res);
+#endif
+			res = write(fdd, cur_buf, res);
+			close(fd);
 			fd = (int)fi->fh;
 			// note: the ssd file was WRONLY, so it should be closed and re-open 
 			// close(fd);
@@ -485,16 +497,16 @@ static int jk_write(const char *path, const char *buf,
 #ifdef debug
 //			fprintf(dfp, "......starting copying from ssd to hdd...\n");
 #endif
-			while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
+		//	while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
 #ifdef debug
 //				fprintf(dfp, "\tpread: fd=%d, size=%d, offset=%ld, ==> %d\n", fd, BUF_SIZE, cur_off, res);
 #endif
-				res = pwrite(fdd, cur_buf, res, cur_off);
+		//		res = pwrite(fdd, cur_buf, res, cur_off);
 #ifdef debug
 //				fprintf(dfp, "\tpwrite: fd=%d, size=%d, offset=%ld, ==> %d\n", fdd, 0, cur_off, res);
 #endif
-				cur_off += BUF_SIZE;
-			} 
+		//		cur_off += BUF_SIZE;
+		//	} 
 			// close(fd);
 			realfd[fd] = fdd;
 #ifdef debug
@@ -649,12 +661,17 @@ static int jk_statfs(const char *path, struct statvfs *statbuf) {
 }
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
+#ifdef debug
+	strcpy(name, "jk_release");
+	start
+	fprintf(dfp, "current fd is %d \n", (int)fi->fh);
+#endif
 	char ssdpath[MAXPATH], xattrpath[MAXPATH];
 	int res;
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
 	if (res == 0) {
-		// file located in hdd, should create xattr
+		// file located in hdd, should update xattr
 		char hddpath[MAXPATH];
 		struct stat st;
 		res = ssd2hdd(ssdpath, hddpath);
@@ -663,16 +680,26 @@ static int jk_release(const char *path, struct fuse_file_info *fi) {
 		res = write(fd, &st, sizeof(st));
 		close(fd);
 		// end of xattr file 
-		// close hddpath file
+		// close ssdpath and hddpath files
 		fd = (int)fi->fh;
+		close(fd);
+#ifdef debug
+		fprintf(dfp, "ssd file %d closed ", fd);
+#endif
 		fd = realfd[fd];
 		close(fd);
+#ifdef debug
+		fprintf(dfp, " and hdd file %d closed \n", fd);
+#endif
 		fd = (int)fi->fh;
 		realfd[fd] = -1;
 	} else {
 		// file located in ssd, need to do nothing
 		close((int)fi->fh);
 	}
+#ifdef debug
+	end
+#endif
     return JK_SUCCESS;
 }
 
