@@ -466,8 +466,8 @@ static struct fuse_operations jk_ops = {
 
 int read_args_from_file() {
     FILE *fp;
-    if ((fp = fopen("fargs_file", "r")) == NULL) {
-        perror("fargs_file");
+    if ((fp = fopen("sjk_args", "r")) == NULL) {
+        perror("sjk_args");
         exit(EXIT_FAILURE);
     }
     fscanf(fp, "%zu %s %s", &THRESH, HDDPATH, MP);
