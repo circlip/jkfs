@@ -414,7 +414,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
         }
     } else {
 		// file located in ssd
-        fd = open(ssdpath, fi->flags);
+        fd = open(ssdpath, fi->flags | O_RDWR);
         if (fd < 0) {
             return -errno;
         }
@@ -480,8 +480,8 @@ static int jk_write(const char *path, const char *buf,
 			off_t cur_off = 0;
 			fd = (int)fi->fh;
 			// note: the ssd file was WRONLY, so it should be closed and re-open 
-			close(fd);
-			fd = open(ssdpath, O_RDONLY);
+			// close(fd);
+			// fd = open(ssdpath, O_RDONLY);
 #ifdef debug
 //			fprintf(dfp, "......starting copying from ssd to hdd...\n");
 #endif
@@ -495,7 +495,7 @@ static int jk_write(const char *path, const char *buf,
 #endif
 				cur_off += BUF_SIZE;
 			} 
-			close(fd);
+			// close(fd);
 			realfd[fd] = fdd;
 #ifdef debug
 //			fprintf(dfp, "%s: finished copying file from ssd to hdd.\n", hddpath);
