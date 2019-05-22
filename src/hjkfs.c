@@ -26,9 +26,6 @@ static char name[32];
 static size_t THRESH;
 static unsigned long count = 0;
 
-#ifdef debug
-#define print_name  printf("##### %s: ", name)
-#endif
 
 #define path2hdd sprintf(hddpath, "%s%s", HDDPATH, path)
 
@@ -196,7 +193,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     }
     fi->fh = fd;
     // close(fd);
-    return FJK_SUCCESS;
+    return res;
 }
 
 static int jk_read(const char *path, char *buf, 
@@ -363,7 +360,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     }
 	fi->fh = res;
     // close(res);
-    return FJK_SUCCESS;
+    return res;
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
