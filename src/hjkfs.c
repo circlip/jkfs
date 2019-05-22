@@ -193,7 +193,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     }
     fi->fh = fd;
     // close(fd);
-    return res;
+    return fd;
 }
 
 static int jk_read(const char *path, char *buf, 
@@ -360,7 +360,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     }
 	fi->fh = res;
     // close(res);
-    return res;
+    return FJK_SUCCESS;
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){

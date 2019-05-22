@@ -6,3 +6,6 @@ hjkfs:
 	gcc -o hjkfs hjkfs.c ${CFLAGS} -g ${LIBS}
 sjkfs:
 	gcc -o sjkfs sjkfs.c ${CFLAGS} -g ${LIBS}
+
+hsjkfs:
+	gcc -o hsjkfs hsjkfs.c ${CFLAGS} -g ${LIBS}

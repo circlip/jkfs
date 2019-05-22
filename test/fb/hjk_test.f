@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-set $dir=/mnt/fjk_mountpoint/tmp
+set $dir=/mnt/hjk_mountpoint/tmp
 set $nfiles=50000
 set $meandirwidth=100
 set $meanfilesize=cvar(type=cvar-gamma, parameters=mean:4096;gamma:1.5)

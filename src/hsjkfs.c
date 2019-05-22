@@ -360,7 +360,7 @@ static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     }
 	fi->fh = res;
     // close(res);
-    return FJK_SUCCESS;
+    return res;
 }
 
 static int jk_utimens(const char *path, const struct timespec ts[2]){
@@ -463,8 +463,8 @@ static struct fuse_operations jk_ops = {
 
 int read_args_from_file() {
     FILE *fp;
-    if ((fp = fopen("sjk_args", "r")) == NULL) {
-        perror("sjk_args");
+    if ((fp = fopen("hjk_args", "r")) == NULL) {
+        perror("hjk_args");
         exit(EXIT_FAILURE);
     }
     fscanf(fp, "%zu %s %s", &THRESH, HDDPATH, MP);
