@@ -7,5 +7,3 @@ hjkfs:
 sjkfs:
 	gcc -o sjkfs sjkfs.c ${CFLAGS} -g ${LIBS}
 
-hsjkfs:
-	gcc -o hsjkfs hsjkfs.c ${CFLAGS} -g ${LIBS}
