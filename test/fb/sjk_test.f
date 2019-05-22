@@ -23,10 +23,10 @@
 # Use is subject to license terms.
 #
 
-set $dir=/home/dio/Documents/jkfs/test/tmp
-set $nfiles=5000
+set $dir=/mnt/sjk_mountpoint/tmp
+set $nfiles=50000
 set $meandirwidth=100
-set $meanfilesize=160k
+set $meanfilesize=cvar(type=cvar-gamma, parameters=mean:4096;gamma:1.5)
 set $iosize=1m
 set $nthreads=1
 
@@ -45,5 +45,5 @@ define process name=filecreate,instances=1
 }
 
 echo  "Createfiles Version 3.0 personality successfully loaded"
-run 20
+run 60
 
