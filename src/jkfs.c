@@ -462,70 +462,34 @@ static int jk_write(const char *path, const char *buf,
 	res = path2ssd(path, ssdpath);
 	res = ssd2xattr(ssdpath, xattrpath);
 	if (res != 0) {
-#ifdef debug
-// 		fprintf(dfp, "%s: no xattr: file originally located in ssd\n", path);
-#endif
  		if (offset + size > THRESH) {
-#ifdef debug
-//			fprintf(dfp, "%s: file too large: should be move to hdd\n", path);
-#endif
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
 			sprintf(hddpath, "%s/%s_%u%lu", HDDPATH, strrchr(path, '/') + 1,
 					(unsigned int)tv.tv_sec, __sync_fetch_and_add(&count, 1));
-#ifdef debug
-//			fprintf(dfp, "%s: hddpath decided.\n", hddpath);
-#endif
+            // copy ssd file to hdd
 			int fdd;
-			fdd = open(hddpath, O_WRONLY | O_CREAT, 0644);
-#ifdef debug
-//			fprintf(dfp, "%s: file descriptor is %d\n", hddpath, fdd);
-#endif
 			char cur_buf[THRESH];
-			off_t cur_off = 0;
+			fdd = open(hddpath, O_WRONLY | O_CREAT, 0644);
 			fd = open(ssdpath, O_RDONLY);
 			res = read(fd, cur_buf, THRESH);
-#ifdef debug
-			fprintf(dfp, "%d bits read from ssd file\n", res);
-#endif
 			res = write(fdd, cur_buf, res);
 			close(fd);
+            
+            // handling file descriptor
 			fd = (int)fi->fh;
-			// note: the ssd file was WRONLY, so it should be closed and re-open 
-			// close(fd);
-			// fd = open(ssdpath, O_RDONLY);
-#ifdef debug
-//			fprintf(dfp, "......starting copying from ssd to hdd...\n");
-#endif
-		//	while ((res = pread(fd, cur_buf, BUF_SIZE, cur_off)) > 0) {
-#ifdef debug
-//				fprintf(dfp, "\tpread: fd=%d, size=%d, offset=%ld, ==> %d\n", fd, BUF_SIZE, cur_off, res);
-#endif
-		//		res = pwrite(fdd, cur_buf, res, cur_off);
-#ifdef debug
-//				fprintf(dfp, "\tpwrite: fd=%d, size=%d, offset=%ld, ==> %d\n", fdd, 0, cur_off, res);
-#endif
-		//		cur_off += BUF_SIZE;
-		//	} 
-			// close(fd);
 			realfd[fd] = fdd;
-#ifdef debug
-//			fprintf(dfp, "%s: finished copying file from ssd to hdd.\n", hddpath);
-#endif
+            // create xattr file
 			fd = open(xattrpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
 			close(fd);
-#ifdef debug
-//			fprintf(dfp, "%s, xattr created and the file descriptor was %d\n", xattrpath, fd);
-#endif
+            // unlink and create symlink
 			unlink(ssdpath);
 			symlink(strrchr(hddpath, '/') + 1, ssdpath);
-#ifdef debug
-//			fprintf(dfp, "created link: %s -> %s\n", ssdpath, hddpath);
-#endif
+            // prepared to write in hdd file
 			fd = fdd;
 		} else {
 #ifdef debug
-//			fprintf(dfp, "%s: file not large, remains in ssd\n", path);
+			fprintf(dfp, "%s: file not large, remains in ssd\n", path);
 #endif
 			fd = (int)fi->fh;
 		}
@@ -556,103 +520,6 @@ static int jk_write(const char *path, const char *buf,
 	end
 #endif
 	return res;
-}
-
-static int jk_write2(const char *path, const char *buf, 
-                    size_t size, off_t offset, 
-                    struct fuse_file_info *fi) {
-    int res, fd;
-    char ssdpath[MAXPATH], xattrpath[MAXPATH];
-    res = path2ssd(path, ssdpath);
-    res = ssd2xattr(ssdpath, xattrpath);
-    if (res != 0) {
-        // res != 0 means that xattr does not exist, file is located in ssd
-		struct stat st;
-		res = lstat(ssdpath, &st);
-		if (res < 0) st.st_size = 0;
-		size_t filesize = (st.st_size > offset + size) ? st.st_size : offset + size;
-
-        if (filesize > THRESH) {
-            // should be move to hdd
-
-            // move to hdd, unlink original, create xattr, open hdd file to assign new fi->fh
-            char hddpath[MAXPATH];
-            struct timeval timestamp;
-            gettimeofday(&timestamp, NULL);
-            sprintf(hddpath, "%s/%s_%u%lu", HDDPATH,
-						strrchr(path, '/') + 1,
-                        (unsigned int)timestamp.tv_sec,
-                        __sync_fetch_and_add(&count, 1)); 
-            // rename(ssdpath, hddpath);
-			// fixme: file failed to move from ssd to hdd through rename.
-            // so manually copy file through pread and pwrite
-            // BUF_SIZE = 131072 is in corespondace with the buffer size in system calls
-			off_t write_offset = 0;
-			char write_buffer[BUF_SIZE];
-            fd = open(hddpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
-			int rfd = open(ssdpath, O_RDONLY);			
-			while ((res = pread(rfd, write_buffer, sizeof(write_buffer), write_offset)) != 0) {
-				res = pwrite(fd, write_buffer, res, write_offset);
-				write_offset += BUF_SIZE;
-			}
-			close(rfd);
-
-            unlink(ssdpath);
-            symlink(strrchr(hddpath, '/') + 1, ssdpath);
-            // fd = open(hddpath, O_WRONLY | O_CREAT | O_EXCL, 0644);
-            res = pwrite(fd, buf, size, offset);
-            fi->fh = fd;
-            close(fd);
-
-            int ress, fdd;
-            struct stat st;
-            if ((ress = lstat(hddpath, &st)) == -1) {
-                return -errno;
-            }
-            if ((fdd = open(xattrpath, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) < 0) {
-                return -errno;
-            }
-            if ((ress = write(fdd, &st, sizeof(st))) != sizeof(st)) {
-                close(fdd);
-                return -errno;
-            }
-            close(fdd);
-            return res;
-
-        } else {
-            fd = open(ssdpath, O_WRONLY | O_CREAT, 0644);
-            // remain in ssd
-            res = pwrite(fd, buf, size, offset);
-            fi->fh = fd;
-            close(fd);
-            return res;
-        }
-    } else {
-        // found xattr file : 
-        // file is located in hdd
-        char hddpath[MAXPATH];
-        res = ssd2hdd(ssdpath, hddpath);
-        fd = open(hddpath, O_WRONLY);
-        res = pwrite(fd, buf, size, offset);
-        fi->fh = fd;
-        close(fd);
-        // update xattr
-        struct stat st;
-        int ress, fdd;
-
-        if ((ress = lstat(hddpath, &st)) == -1) {
-            return -errno;
-        } 
-        if ((fdd = open(xattrpath, O_WRONLY)) < 0) {
-            return -errno;
-        }
-        if ((ress = write(fdd, &st, sizeof(st))) != sizeof(st)) {
-            close(fdd);
-            return -errno;
-        }
-        close(fdd);
-        return res;
-    }
 }
 
 static int jk_statfs(const char *path, struct statvfs *statbuf) {

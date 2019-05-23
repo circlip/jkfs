@@ -237,7 +237,7 @@ static int jk_flush(const char *path, struct fuse_file_info *fi) {
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
     int res;
-    res = close(fi->fh);
+    res = close((int)fi->fh);
     if (res < 0) {
         return -errno;
     }
@@ -248,9 +248,9 @@ static int jk_fsync(const char *path, int isdatasync,
                     struct fuse_file_info *fi) {
     int res;
     if (isdatasync) 
-        res = fdatasync(fi->fh);
+        res = fdatasync((int)fi->fh);
     else
-        res = fsync(fi->fh);
+        res = fsync((int)fi->fh);
     if (res < 0) {
         return -errno;
     }
@@ -401,7 +401,7 @@ static int jk_fallocate(const char *path, int mode,
     if (res < 0) {
         return -errno;
     }
-    fd = fi->fh;
+    fd = (int)fi->fh;
     res = fallocate(fd, mode, offset, length);
     if (res < 0) {
         return -errno;
