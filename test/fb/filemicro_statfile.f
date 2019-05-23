@@ -23,33 +23,26 @@
 # Use is subject to license terms.
 #
 
+#
+# Creates a fileset of $nfiles number of files, then loops through them
+# using $nthreads number of threads, doing "stat" calls on each file.
+#
+
 set $dir=/mnt/jk_mountpoint/tmp
 set $nfiles=10000
 set $meandirwidth=20
-set $filesize=cvar(type=cvar-gamma,parameters=mean:4096;gamma:1.5)
-set $nthreads=1
-set $iosize=1m
-set $meanappendsize=16k
-set $runtime=6
+set $filesize=3k
+set $nthreads=2
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100
 
-define process name=filereader,instances=1
+define process name=examinefiles,instances=1
 {
-  thread name=filereaderthread,memsize=10m,instances=$nthreads
+  thread name=examinefilethread, memsize=10m,instances=$nthreads
   {
-    flowop createfile name=createfile1,filesetname=bigfileset,fd=1
-    flowop writewholefile name=wrtfile1,srcfd=1,fd=1,iosize=$iosize
-    flowop closefile name=closefile1,fd=1
-    flowop openfile name=openfile1,filesetname=bigfileset,fd=1
-    flowop closefile name=closefile2,fd=1
-    flowop openfile name=openfile2,filesetname=bigfileset,fd=1
-    flowop readwholefile name=readfile1,fd=1,iosize=$iosize
-    flowop closefile name=closefile3,fd=1
-    flowop deletefile name=deletefile1,filesetname=bigfileset
+    flowop statfile name=statfile1,filesetname=bigfileset
   }
 }
 
-echo  "File-server Version 3.0 personality successfully loaded"
-
-run $runtime
+echo  "Stat File Version 1.0 personality successfully loaded"
+run 10

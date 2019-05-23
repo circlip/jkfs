@@ -27,7 +27,7 @@ static size_t THRESH;
 static unsigned long count = 0;
 
 
-#define path2hdd sprintf(hddpath, "%s/%s", HDDPATH, path)
+#define path2hdd sprintf(hddpath, "%s%s", HDDPATH, path)
 
 static int jk_getattr(const char *path, struct stat *stbuf) {
 	char hddpath[MAXPATH];
@@ -193,14 +193,14 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     }
     fi->fh = fd;
     // close(fd);
-    return FJK_SUCCESS;
+    return fd;
 }
 
 static int jk_read(const char *path, char *buf, 
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
 	int res, fd;
-	fd = (int)fi->fh;
+	fd = fi->fh;
     res = pread(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
@@ -212,7 +212,7 @@ static int jk_write(const char *path, const char *buf,
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
     int res, fd;
-	fd = (int)fi->fh;
+	fd = fi->fh;
     res = pwrite(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
@@ -237,7 +237,7 @@ static int jk_flush(const char *path, struct fuse_file_info *fi) {
 
 static int jk_release(const char *path, struct fuse_file_info *fi) {
     int res;
-    res = close((int)fi->fh);
+    res = close(fi->fh);
     if (res < 0) {
         return -errno;
     }
@@ -248,9 +248,9 @@ static int jk_fsync(const char *path, int isdatasync,
                     struct fuse_file_info *fi) {
     int res;
     if (isdatasync) 
-        res = fdatasync((int)fi->fh);
+        res = fdatasync(fi->fh);
     else
-        res = fsync((int)fi->fh);
+        res = fsync(fi->fh);
     if (res < 0) {
         return -errno;
     }
@@ -352,14 +352,14 @@ static int jk_access(const char *path, int mask) {
 
 static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     char hddpath[MAXPATH];
-    // int res;
+    int res;
     path2hdd;
-	// res = creat(hddpath, mode);
-	int fd = open(hddpath, fi->flags, mode);
-    if (fd < 0) {
+    res = creat(hddpath, mode);
+    if (res < 0) {
         return -errno;
     }
-	fi->fh = fd;
+	fi->fh = res;
+    // close(res);
     return FJK_SUCCESS;
 }
 
@@ -401,7 +401,7 @@ static int jk_fallocate(const char *path, int mode,
     if (res < 0) {
         return -errno;
     }
-    fd = (int)fi->fh;
+    fd = fi->fh;
     res = fallocate(fd, mode, offset, length);
     if (res < 0) {
         return -errno;

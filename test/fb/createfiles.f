@@ -22,34 +22,38 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-set $dir=/mnt/jk_mountpoint/tmp
-set $nfiles=10000
-set $meandirwidth=20
-set $filesize=cvar(type=cvar-gamma,parameters=mean:4096;gamma:1.5)
-set $nthreads=1
+# Creates a fileset with 20,000 entries ($nfiles), but only preallocates
+# 50% of the files.  Each file's size is set via a gamma distribution with
+# a median size of 1KB ($filesize).
+#
+# The single thread then creates a new file and writes the whole file with
+# 1MB I/Os.  The thread stops after 5000 files ($count/num of flowops) have
+# been created and written to.
+
+set $dir=/mnt/hjk_mountpoint/tmp
+set $count=15000
+set $filesize=4k
 set $iosize=1m
-set $meanappendsize=16k
-set $runtime=6
+set $meandirwidth=100000
+set $nfiles=20000
+set $nthreads=1
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80
+set mode quit firstdone
 
-define process name=filereader,instances=1
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=50
+
+define process name=filecreate,instances=1
 {
-  thread name=filereaderthread,memsize=10m,instances=$nthreads
+  thread name=filecreatethread,memsize=10m,instances=$nthreads
   {
     flowop createfile name=createfile1,filesetname=bigfileset,fd=1
-    flowop writewholefile name=wrtfile1,srcfd=1,fd=1,iosize=$iosize
+    flowop writewholefile name=writefile1,filesetname=bigfileset,fd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
-    flowop openfile name=openfile1,filesetname=bigfileset,fd=1
-    flowop closefile name=closefile2,fd=1
-    flowop openfile name=openfile2,filesetname=bigfileset,fd=1
-    flowop readwholefile name=readfile1,fd=1,iosize=$iosize
-    flowop closefile name=closefile3,fd=1
-    flowop deletefile name=deletefile1,filesetname=bigfileset
+    flowop finishoncount name=finish,value=$count
   }
 }
 
-echo  "File-server Version 3.0 personality successfully loaded"
-
-run $runtime
+echo  "FileMicro-Createfiles Version 2.2 personality successfully loaded"
+run 5
