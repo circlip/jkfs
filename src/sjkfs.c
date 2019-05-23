@@ -200,7 +200,7 @@ static int jk_read(const char *path, char *buf,
                    size_t size, off_t offset, 
                    struct fuse_file_info *fi) {
 	int res, fd;
-	fd = fi->fh;
+	fd = (int)fi->fh;
     res = pread(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
@@ -212,7 +212,7 @@ static int jk_write(const char *path, const char *buf,
                     size_t size, off_t offset, 
                     struct fuse_file_info *fi) {
     int res, fd;
-	fd = fi->fh;
+	fd = (int)fi->fh;
     res = pwrite(fd, buf, size, offset);
     if (res < 0) {
         return -errno;
@@ -352,14 +352,14 @@ static int jk_access(const char *path, int mask) {
 
 static int jk_creat(const char *path, mode_t mode, struct fuse_file_info *fi) {
     char hddpath[MAXPATH];
-    int res;
+    // int res;
     path2hdd;
-    res = creat(hddpath, mode);
-    if (res < 0) {
+	// res = creat(hddpath, mode);
+	int fd = open(hddpath, fi->flags, mode);
+    if (fd < 0) {
         return -errno;
     }
-	fi->fh = res;
-    // close(res);
+	fi->fh = fd;
     return FJK_SUCCESS;
 }
 
