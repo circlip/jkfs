@@ -27,7 +27,7 @@ static size_t THRESH;
 static unsigned long count = 0;
 
 
-#define path2hdd sprintf(hddpath, "%s%s", HDDPATH, path)
+#define path2hdd sprintf(hddpath, "%s/%s", HDDPATH, path)
 
 static int jk_getattr(const char *path, struct stat *stbuf) {
 	char hddpath[MAXPATH];
@@ -193,7 +193,7 @@ static int jk_open(const char *path, struct fuse_file_info *fi) {
     }
     fi->fh = fd;
     // close(fd);
-    return fd;
+    return FJK_SUCCESS;
 }
 
 static int jk_read(const char *path, char *buf, 

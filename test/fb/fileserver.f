@@ -24,9 +24,9 @@
 #
 
 set $dir=/mnt/sjk_mountpoint/tmp
-set $nfiles=100
+set $nfiles=10000
 set $meandirwidth=20
-set $filesize=cvar(type=cvar-gamma,parameters=mean:40960;gamma:1.5)
+set $filesize=cvar(type=cvar-gamma,parameters=mean:4096;gamma:1.5)
 set $nthreads=1
 set $iosize=1m
 set $meanappendsize=16k
