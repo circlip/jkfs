@@ -23,14 +23,16 @@
 # Use is subject to license terms.
 #
 
-set $dir=/mnt/jk_mountpoint/tmp
+# set $dir=/mnt/jk_mountpoint/tmp
+# set $dir=/mnt/sjk_mountpoint/tmp
+set $dir=/home/dio/hjk_mountpoint/tmp
 set $nfiles=10000
 set $meandirwidth=20
 set $filesize=cvar(type=cvar-gamma,parameters=mean:4096;gamma:1.5)
 set $nthreads=1
 set $iosize=1m
-set $meanappendsize=16k
-set $runtime=6
+set $meanappendsize=4k
+set $runtime=60
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80
 
@@ -42,6 +44,7 @@ define process name=filereader,instances=1
     flowop writewholefile name=wrtfile1,srcfd=1,fd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
     flowop openfile name=openfile1,filesetname=bigfileset,fd=1
+	flowop appendfilerand name=appendfilerand1,iosize=$meanappendsize,fd=1
     flowop closefile name=closefile2,fd=1
     flowop openfile name=openfile2,filesetname=bigfileset,fd=1
     flowop readwholefile name=readfile1,fd=1,iosize=$iosize

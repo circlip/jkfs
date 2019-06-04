@@ -22,28 +22,25 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
+# Creates a directory with $ndirs potential leaf directories, than mkdir's them
 #
-# Creates a fileset of $nfiles number of files, then loops through them
-# using $nthreads number of threads, doing "stat" calls on each file.
-#
-
 #set $dir=/mnt/jk_ssd/tmp
 set $dir=/home/dio/tmpfile/tmp
-set $nfiles=100000
-set $meandirwidth=20
-set $filesize=3k
-set $nthreads=2
+set $ndirs=100000
+set $meandirwidth=100
+set $nthreads=16
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100
+set mode quit firstdone
 
-define process name=examinefiles,instances=1
+define fileset name=bigfileset,path=$dir,size=0,leafdirs=$ndirs,dirwidth=$meandirwidth
+
+define process name=dirmake,instances=1
 {
-  thread name=examinefilethread, memsize=10m,instances=$nthreads
+  thread name=dirmaker,memsize=1m,instances=$nthreads
   {
-    flowop statfile name=statfile1,filesetname=bigfileset
+    flowop makedir name=mkdir1,filesetname=bigfileset
   }
 }
 
-echo  "Stat File Version 1.0 personality successfully loaded"
+echo  "MakeDirs Version 1.0 personality successfully loaded"
 run 10
